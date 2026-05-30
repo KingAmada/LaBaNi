@@ -4,6 +4,8 @@ const APP_SHELL = [
   './index.html',
   './manifest.webmanifest',
   './assets/labani-icon.svg',
+  './assets/favicon-32x32.png',
+  './assets/favicon-16x16.png',
   './assets/labani-icon-192.png',
   './assets/labani-icon-512.png',
   './assets/apple-touch-icon.png',
