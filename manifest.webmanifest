@@ -1,0 +1,68 @@
+{
+  "name": "LaBaNi 2026 - Last Born Association Party",
+  "short_name": "LaBaNi 2026",
+  "description": "Official LaBaNi 2026 PWA for the Last Born Association of Nigeria: Abuja exclusive party tickets, QR access, VIP Dons, Naija highlife, pool, grill, lounge, nightclub and concert zones.",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#db2777",
+  "categories": ["entertainment", "events", "lifestyle", "music"],
+  "lang": "en-NG",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "assets/labani-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/labani-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/labani-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/evening-labani-concert-stage%20Large.jpeg",
+      "sizes": "1792x1024",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "LaBaNi 2026 concert stage with VIP tables and Abuja celebrity party crowd"
+    },
+    {
+      "src": "assets/pool-party-resort%20Large.jpeg",
+      "sizes": "1024x1536",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "LaBaNi pool side resort party for rich Naija Last Born Association guests"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Buy Tickets",
+      "short_name": "Tickets",
+      "description": "Open LaBaNi 2026 ticket checkout.",
+      "url": "/#tickets",
+      "icons": [{ "src": "assets/labani-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Admin Scan",
+      "short_name": "Scan",
+      "description": "Open the LaBaNi bouncer QR scanner.",
+      "url": "/#admin",
+      "icons": [{ "src": "assets/labani-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

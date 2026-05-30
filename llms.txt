@@ -1,0 +1,23 @@
+# LaBaNi
+
+LaBaNi is the official ticketing page for the Last Born Association Party at Kintik Resort in Nigeria.
+
+## Primary Page
+
+- `/`: LaBaNi event booking app for standard entry tickets, resort activity selection, group guest tickets, payment details and Don of Last Borns VIP access.
+
+## Key Facts
+
+- Event name: LaBaNi Last Born Association Party
+- Venue: Kintik Resort, Nigeria
+- Base entry ticket: NGN 50,000 per guest
+- VIP package: Don of Last Borns, NGN 500,000
+- VIP capacity: 10 slots
+- Activities: Nightclub, Pool Side, Playhouse, Train Ride, Lounge, Karaoke Sit-out / Restaurant and Concert
+- Payment bank: Stanbic IBTC
+- Payment account number: 5770807090
+- Payment account name: LaBaNi
+
+## Crawl Notes
+
+The page includes Schema.org JSON-LD structured data for the organization, website, event, offers, resort activities and FAQs.
