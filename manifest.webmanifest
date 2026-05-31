@@ -37,14 +37,14 @@
     {
       "src": "assets/evening-labani-concert-stage%20Large.jpeg",
       "sizes": "1792x1024",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "wide",
       "label": "LaBaNi 2026 concert stage with VIP tables and Abuja celebrity party crowd"
     },
     {
       "src": "assets/pool-party-resort%20Large.jpeg",
       "sizes": "1024x1536",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "LaBaNi pool side resort party for rich Naija Last Born Association guests"
     }

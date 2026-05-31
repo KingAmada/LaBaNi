@@ -615,12 +615,14 @@
 
             if (canInstall) {
                 copy.textContent = 'Add tickets, QR access and zones to your phone.';
+                installButton.textContent = 'Install';
                 installButton.classList.remove('hidden');
             } else {
                 copy.textContent = showIosGuide
                     ? 'iPhone: tap Share, then Add to Home Screen.'
-                    : 'Use your browser menu to add LaBaNi to your phone.';
-                installButton.classList.add('hidden');
+                    : 'Tap Install. If your browser blocks the popup, use the browser install icon or menu.';
+                installButton.textContent = showIosGuide ? 'How' : 'Install';
+                installButton.classList.remove('hidden');
             }
 
             showInstallPrompt();
@@ -756,7 +758,13 @@
         };
 
         window.installLaBaniApp = async () => {
-            if (!deferredInstallPrompt) return;
+            if (!deferredInstallPrompt) {
+                const message = isIosInstallCandidate()
+                    ? 'On iPhone: tap the Share button, then choose Add to Home Screen.'
+                    : 'If the browser install popup is not ready yet, use Chrome/Edge address bar install icon or browser menu > Install app. Refresh once after the service worker registers.';
+                alert(message);
+                return;
+            }
             deferredInstallPrompt.prompt();
             const choice = await deferredInstallPrompt.userChoice;
             if (choice.outcome === 'accepted') {
@@ -966,6 +974,15 @@
             throw new Error('This QR code is not a LaBaNi ticket.');
         };
 
+        const getCurrentZoneMap = (scans) => {
+            return scans
+                .filter(scan => scan.status === 'permitted' && scan.passId)
+                .reduce((current, scan) => {
+                    current[scan.passId] = scan;
+                    return current;
+                }, {});
+        };
+
         const verifyTicketForZone = (rawValue, zoneId) => {
             const payload = parseScanPayload(rawValue);
             const tickets = readStore(STORAGE_KEYS.tickets, {});
@@ -1040,7 +1057,9 @@
                 return { ok: false, title: 'Bounce Off', message: denied.reason, ticket, scan: denied };
             }
 
-            const alreadyEntered = scans.some(scan => scan.status === 'permitted' && scan.passId === ticket.passId && scan.zoneId === zoneId);
+            const currentZone = getCurrentZoneMap(scans)[ticket.passId];
+            const alreadyEntered = currentZone && currentZone.zoneId === zoneId;
+            const movedFromZone = currentZone && currentZone.zoneId !== zoneId ? currentZone : null;
             const permitted = {
                 id: 'scan-' + Date.now(),
                 passId: ticket.passId,
@@ -1049,7 +1068,14 @@
                 zoneName: zone.name,
                 status: 'permitted',
                 repeat: alreadyEntered,
-                reason: alreadyEntered ? 'Already counted in this zone' : 'Entry permitted and counted',
+                moved: Boolean(movedFromZone),
+                previousZoneId: movedFromZone ? movedFromZone.zoneId : null,
+                previousZoneName: movedFromZone ? movedFromZone.zoneName : null,
+                reason: alreadyEntered
+                    ? `Already counted inside ${zone.name}`
+                    : movedFromZone
+                        ? `${ticket.name} moved from ${movedFromZone.zoneName} to ${zone.name}`
+                        : `Entry permitted and counted inside ${zone.name}`,
                 scannedAt: new Date().toISOString()
             };
             scans.push(permitted);
@@ -1057,7 +1083,7 @@
 
             return {
                 ok: true,
-                title: alreadyEntered ? 'Already Inside' : 'Entry Permitted',
+                title: alreadyEntered ? 'Already Inside' : (movedFromZone ? 'Moved Zones' : 'Entry Permitted'),
                 message: permitted.reason,
                 ticket,
                 scan: permitted
@@ -1067,15 +1093,17 @@
         const getZoneAnalytics = () => {
             const tickets = Object.values(readStore(STORAGE_KEYS.tickets, {}));
             const scans = readStore(STORAGE_KEYS.scans, []);
+            const currentZones = Object.values(getCurrentZoneMap(scans));
 
             return getAllZones().map(zone => {
                 const entitled = tickets.filter(ticket => ticket.paid && ticket.zones.includes(zone.id)).length;
-                const permittedPasses = new Set(scans.filter(scan => scan.status === 'permitted' && scan.zoneId === zone.id).map(scan => scan.passId));
+                const currentGuests = currentZones.filter(scan => scan.zoneId === zone.id);
                 const denied = scans.filter(scan => scan.status === 'denied' && scan.zoneId === zone.id).length;
                 return {
                     ...zone,
                     entitled,
-                    inside: permittedPasses.size,
+                    inside: currentGuests.length,
+                    currentGuests,
                     denied,
                     scans: scans.filter(scan => scan.zoneId === zone.id).length
                 };
@@ -2687,33 +2715,53 @@
                 </div>
             ` : '';
 
-            const analyticsHTML = analytics.map(zone => `
-                <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2 text-pink-600 mb-1">
-                                <i data-lucide="${zone.icon}" class="w-4 h-4"></i>
-                                <p class="text-[10px] font-black uppercase tracking-widest truncate">${zone.name}</p>
+            const analyticsHTML = analytics.map(zone => {
+                const currentGuestNames = zone.currentGuests
+                    .map(scan => scan.guestName || scan.passId)
+                    .filter(Boolean)
+                    .slice(0, 4)
+                    .join(', ');
+                const extraGuests = zone.currentGuests.length > 4 ? ` +${zone.currentGuests.length - 4} more` : '';
+                return `
+                    <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 text-pink-600 mb-1">
+                                    <i data-lucide="${zone.icon}" class="w-4 h-4"></i>
+                                    <p class="text-[10px] font-black uppercase tracking-widest truncate">${zone.name}</p>
+                                </div>
+                                <p class="text-xs text-slate-500 font-semibold">${zone.entitled} paid access · ${zone.denied} bounced</p>
+                                ${currentGuestNames ? `<p class="text-[11px] text-slate-700 font-black mt-1 truncate">Current: ${currentGuestNames}${extraGuests}</p>` : ''}
                             </div>
-                            <p class="text-xs text-slate-500 font-semibold">${zone.entitled} paid access · ${zone.denied} bounced</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-3xl font-black text-slate-900">${zone.inside}</p>
-                            <p class="text-[10px] text-slate-400 font-black uppercase">Inside</p>
+                            <div class="text-right">
+                                <p class="text-3xl font-black text-slate-900">${zone.inside}</p>
+                                <p class="text-[10px] text-slate-400 font-black uppercase">Inside</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
-            const recentScansHTML = scans.slice(-8).reverse().map(scan => `
-                <div class="flex items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
-                    <div class="min-w-0">
-                        <p class="font-black text-sm text-slate-800 truncate">${scan.guestName || scan.passId}</p>
-                        <p class="text-xs text-slate-500 truncate">${scan.zoneName} · ${new Date(scan.scannedAt).toLocaleString()}</p>
+            const recentScansHTML = scans.slice(-8).reverse().map(scan => {
+                const statusText = scan.status === 'permitted'
+                    ? (scan.moved ? 'moved' : (scan.repeat ? 'repeat' : 'entered'))
+                    : 'denied';
+                const statusClass = scan.status === 'permitted'
+                    ? (scan.moved ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700')
+                    : 'bg-red-100 text-red-700';
+                const zoneText = scan.moved && scan.previousZoneName
+                    ? `${scan.previousZoneName} -> ${scan.zoneName}`
+                    : scan.zoneName;
+                return `
+                    <div class="flex items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
+                        <div class="min-w-0">
+                            <p class="font-black text-sm text-slate-800 truncate">${scan.guestName || scan.passId}</p>
+                            <p class="text-xs text-slate-500 truncate">${zoneText} · ${new Date(scan.scannedAt).toLocaleString()}</p>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ${statusClass}">${statusText}</span>
                     </div>
-                    <span class="px-2 py-1 rounded-full text-[10px] font-black uppercase ${scan.status === 'permitted' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${scan.status}${scan.repeat ? ' repeat' : ''}</span>
-                </div>
-            `).join('') || `<p class="text-sm text-slate-500 font-semibold py-4">No scans yet.</p>`;
+                `;
+            }).join('') || `<p class="text-sm text-slate-500 font-semibold py-4">No scans yet.</p>`;
 
             container.innerHTML = `
                 <div class="p-6 space-y-6 pb-10">
