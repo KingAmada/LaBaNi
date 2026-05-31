@@ -15,21 +15,9 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "assets/labani-icon-192.png",
-      "sizes": "192x192",
+      "src": "Logo%20%26%20Fav%20Icon.png",
+      "sizes": "700x700",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "assets/labani-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "assets/labani-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
@@ -55,14 +43,14 @@
       "short_name": "Tickets",
       "description": "Open LaBaNi 2026 ticket checkout.",
       "url": "/#tickets",
-      "icons": [{ "src": "assets/labani-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "Logo%20%26%20Fav%20Icon.png", "sizes": "700x700", "type": "image/png" }]
     },
     {
       "name": "Admin Scan",
       "short_name": "Scan",
       "description": "Open the LaBaNi bouncer QR scanner.",
       "url": "/#admin",
-      "icons": [{ "src": "assets/labani-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+      "icons": [{ "src": "Logo%20%26%20Fav%20Icon.png", "sizes": "700x700", "type": "image/png" }]
     }
   ]
 }

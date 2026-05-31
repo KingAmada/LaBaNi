@@ -1,16 +1,11 @@
-const CACHE_NAME = 'labani-pwa-v3';
+const CACHE_NAME = 'labani-pwa-v4';
 const APP_SHELL = [
   './',
   './index.html',
   './terms.html',
   './privacy.html',
   './manifest.webmanifest',
-  './assets/labani-icon.svg',
-  './assets/favicon-32x32.png',
-  './assets/favicon-16x16.png',
-  './assets/labani-icon-192.png',
-  './assets/labani-icon-512.png',
-  './assets/apple-touch-icon.png',
+  './Logo%20%26%20Fav%20Icon.png',
   './assets/trampoline-foam-pit-group%20Large.jpeg',
   './assets/trampoline-flip-foam-pit%20Large.jpeg',
   './assets/foam-pit-party-group%20Large.jpeg',
