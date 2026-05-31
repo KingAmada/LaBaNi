@@ -1,7 +1,9 @@
-const CACHE_NAME = 'labani-pwa-v2';
+const CACHE_NAME = 'labani-pwa-v3';
 const APP_SHELL = [
   './',
   './index.html',
+  './terms.html',
+  './privacy.html',
   './manifest.webmanifest',
   './assets/labani-icon.svg',
   './assets/favicon-32x32.png',

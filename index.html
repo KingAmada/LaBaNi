@@ -172,6 +172,11 @@
             from { transform: translateX(0); }
             to { transform: translateX(-50%); }
         }
+        @keyframes introScan {
+            0%, 100% { transform: translateX(-15%); opacity: 0; }
+            45%, 55% { opacity: 1; }
+            50% { transform: translateX(115%); }
+        }
 
         /* Animation Utility Classes */
         .animate-fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
@@ -186,6 +191,7 @@
         .delay-200 { animation-delay: 200ms; }
         .delay-300 { animation-delay: 300ms; }
         .delay-400 { animation-delay: 400ms; }
+        .intro-scan-line { animation: introScan 1.4s ease-in-out infinite; }
     </style>
 </head>
 
@@ -203,18 +209,10 @@
                         LaBaNi <i data-lucide="party-popper" class="text-pink-500 w-6 h-6 not-italic animate-bounce"></i>
                     </h1>
                 </div>
-                <div class="flex items-center gap-2 animate-slide-in-right delay-100">
+                <div class="animate-slide-in-right delay-100">
                     <div class="blink-deal rounded-2xl bg-red-600 text-white px-3 py-1.5 text-right shadow-lg shadow-red-200 border border-red-400">
                         <p class="text-[10px] font-black leading-none tracking-widest">LIVE DEAL</p>
                         <p class="text-xs font-black leading-tight">UPDATING</p>
-                    </div>
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-yellow-400 p-[2px] shadow-md shadow-pink-200 glow-effect">
-                        <img 
-                            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" 
-                            alt="LaBaNi 2026 VIP guest profile for the Last Born Association exclusive Abuja party" 
-                            title="LaBaNi VIP guest, Last Born Association, Abuja exclusive party, Naija spenders"
-                            class="w-full h-full rounded-full object-cover border-2 border-white"
-                        />
                     </div>
                 </div>
             </div>
@@ -301,6 +299,21 @@
         </div>
     </div>
 
+    <div id="labani-intro" class="fixed inset-0 z-[100] bg-slate-950 text-white flex items-center justify-center p-6 transition-all duration-700">
+        <div class="w-full max-w-sm text-center">
+            <div class="relative mx-auto mb-8 w-24 h-24 rounded-[2rem] bg-gradient-to-br from-pink-500 to-yellow-400 p-[2px] shadow-2xl shadow-pink-500/20">
+                <div class="relative w-full h-full rounded-[1.85rem] bg-slate-950 flex items-center justify-center overflow-hidden">
+                    <i data-lucide="scan-face" class="w-11 h-11 text-pink-300"></i>
+                    <div class="intro-scan-line absolute top-0 bottom-0 w-8 bg-pink-300/30 blur-sm"></div>
+                </div>
+            </div>
+            <div id="labani-intro-copy" class="min-h-[9rem] flex flex-col items-center justify-center gap-3">
+                <p class="text-pink-300 text-sm font-black uppercase tracking-[0.35em] animate-fade-in-up">Wait&hellip;</p>
+                <h2 class="text-3xl font-black italic uppercase leading-tight animate-fade-in-up delay-100">Loading your Last Born reward.</h2>
+            </div>
+        </div>
+    </div>
+
     <!-- Application Logic -->
     <script>
         // --- CONSTANTS & DATA ---
@@ -350,16 +363,6 @@
                 keywords: 'LaBaNi playhouse, resort games, last born fun, Abuja party activities, Naija event games'
             },
             {
-                id: 'a4',
-                name: 'Train Ride',
-                type: 'Resort Tour',
-                img: 'assets/checkerboard-walkway-party-crowd Large.jpeg',
-                price: 10000,
-                icon: 'train',
-                description: 'Resort tour access through the Kintik party grounds, checkerboard walkways, Abuja crowd scenes and LaBaNi 2026 exclusive resort movement.',
-                keywords: 'LaBaNi resort tour, Kintik Resort, Abuja exclusive party, Naija crowd, Last Born Association 2026'
-            },
-            {
                 id: 'a5',
                 name: 'Lounge',
                 type: 'Premium Chilling',
@@ -392,7 +395,7 @@
         ];
 
         const VIP_PERKS = [
-            "Unrestricted access to all 7 Resort Zones",
+            "Unrestricted access to all 6 Resort Zones",
             "Premium bottle service & bottomless drinks",
             "Dedicated personal concierge for the night",
             "Front row seating at the Live Concert",
@@ -412,11 +415,128 @@
             { id: 10, src: 'assets/restaurant-lounge-dining Large.jpeg', hook: 'The resort is ready. The question is, are you?', alt: 'LaBaNi restaurant lounge dining scene with VIP guests, Naija social energy and premium Abuja resort party setting.', keywords: 'LaBaNi lounge, restaurant, Abuja resort party, VIP dining' }
         ];
 
+        const ZONE_SLIDER_MEDIA = [
+            { id: 1, src: 'assets/pool-party-resort Large.jpeg', label: 'Pool Side', description: 'Wet and wild resort energy with cabanas, swimwear and premium LaBaNi pool party vibes.', keywords: 'LaBaNi pool party, Abuja pool side, Kintik Resort cabana, premium Naija party' },
+            { id: 2, src: 'assets/indoor-obstacle-play-area Large.jpeg', label: 'Playhouse', description: 'Indoor games, obstacle fun and playful Last Born Association resort energy.', keywords: 'LaBaNi playhouse, indoor obstacle play area, last born games, Abuja party activities' },
+            { id: 3, src: 'assets/restaurant-lounge-dining Large.jpeg', label: 'Lounge', description: 'Premium dining, bottle service conversations and rich Naija lounge ambience.', keywords: 'LaBaNi lounge, restaurant lounge, VIP dining, Abuja premium chilling' },
+            { id: 4, src: 'assets/kintik-suya-grill-rotisserie Large.jpeg', label: 'Grill Party', description: 'Kintik suya, grills and outdoor food culture for guests who came hungry and ready.', keywords: 'Kintik suya grill, LaBaNi grill party, Nigerian food, Abuja resort party' },
+            { id: 5, src: 'assets/red-lit-nightclub-vip-lounge Large.jpeg', label: 'Nightclub', description: 'Red-lit VIP lounge, late night Afrobeats and celebrity-style spender energy.', keywords: 'LaBaNi nightclub, VIP lounge, Afrobeats party, Abuja nightlife' },
+            { id: 6, src: 'assets/outdoor-patio-restaurant-crowd Large.jpeg', label: 'Karaoke Sit-out', description: 'Outdoor patio restaurant, vocals, drinks and highlife social scenes.', keywords: 'LaBaNi karaoke, outdoor restaurant, highlife, Abuja sit-out' },
+            { id: 7, src: 'assets/evening-labani-concert-stage Large.jpeg', label: 'Concert', description: 'Live stage, VIP tables and the biggest LaBaNi performance moment.', keywords: 'LaBaNi concert, live stage, VIP tables, biggest party in Abuja' }
+        ];
+
         const SOCIAL_PROOF = [
             "🎉 Chief Emeka secured a VIP Slot!",
             "🔥 50+ last borns just joined the Pool Side.",
             "👑 Only 3 VIP Don slots remaining!",
             "💸 Amaka just paid ₦150k for her squad.",
+        ];
+
+        const INTRO_REWARD_DURATION_MS = 120000;
+        const INTRO_REWARD_SHOW_RATE = 0.18;
+        const INTRO_REWARD_DECISION_KEY = 'labani_intro_reward_decision_v1';
+        const MIN_REWARD_PERCENT = 30;
+        const MAX_REWARD_PERCENT = 55;
+        const INTRO_REWARD_VARIANTS = [
+            {
+                id: 'lucky-enjoyment',
+                applies: () => true,
+                build: ({ percent, visitorNumber, countdownHTML }) => `
+                    <div class="space-y-4 animate-fade-in-up">
+                        <p class="text-pink-300 text-sm font-black uppercase tracking-[0.35em]">Wait&hellip;</p>
+                        <h2 class="text-2xl font-black italic uppercase leading-tight">You&rsquo;re the ${visitorNumber}th Last Born to visit LaBaNi today.</h2>
+                        <p class="text-sm font-bold text-slate-300">${visitorNumber} is our lucky enjoyment number.</p>
+                        <div class="bg-white/10 border border-white/10 rounded-2xl p-4">
+                            <p class="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Your visitor reward just unlocked</p>
+                            <p class="text-4xl font-black text-white">${percent}% OFF</p>
+                            <p class="text-sm font-bold text-slate-300">your LaBaNi Entry Pass</p>
+                            ${countdownHTML}
+                        </div>
+                    </div>
+                `,
+                button: ({ percent }) => `Claim My ${percent}% Reward`,
+                footnote: 'Not every visitor sees this.'
+            },
+            {
+                id: 'visitor-number',
+                applies: () => true,
+                build: ({ percent, visitorNumber, countdownHTML }) => `
+                    <div class="space-y-4 animate-fade-in-up">
+                        <p class="text-pink-300 text-sm font-black uppercase tracking-[0.35em]">Hold on&hellip;</p>
+                        <h2 class="text-2xl font-black italic uppercase leading-tight">You&rsquo;re visitor number ${visitorNumber} today.</h2>
+                        <p class="text-sm font-bold text-slate-300">In LaBaNi culture, ${visitorNumber} means enjoyment has located you.</p>
+                        <div class="bg-white/10 border border-white/10 rounded-2xl p-4">
+                            <p class="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Your reward</p>
+                            <p class="text-4xl font-black text-white">${percent}% OFF</p>
+                            <p class="text-sm font-bold text-slate-300">your Last Born Pass</p>
+                            <p class="text-xs font-black text-red-200 mt-3">But there&rsquo;s a problem: it expires in ${countdownHTML}.</p>
+                        </div>
+                    </div>
+                `,
+                button: ({ percent }) => `Claim My ${percent}% Reward`,
+                footnote: 'Not every visitor sees this.'
+            },
+            {
+                id: 'local-reward',
+                applies: () => isNigeriaVisitor(),
+                build: ({ percent, countdownHTML }) => `
+                    <div class="space-y-4 animate-fade-in-up">
+                        <p class="text-pink-300 text-sm font-black uppercase tracking-[0.3em]">Abuja visitor detected.</p>
+                        <h2 class="text-2xl font-black italic uppercase leading-tight">You are close enough to make it to LaBaNi.</h2>
+                        <p class="text-sm font-bold text-slate-300">Because you opened this from Nigeria, your local reward is active.</p>
+                        <div class="bg-white/10 border border-white/10 rounded-2xl p-4">
+                            <p class="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Naija Last Born Discount Unlocked</p>
+                            <p class="text-3xl font-black text-white">${percent}% OFF</p>
+                            <p class="text-sm font-bold text-slate-300">₦100,000 ticket now reduced for this session.</p>
+                            ${countdownHTML}
+                        </div>
+                    </div>
+                `,
+                button: () => 'Claim My Local Reward',
+                footnote: 'Not every visitor sees this.'
+            },
+            {
+                id: 'night-owl',
+                applies: () => {
+                    const hour = new Date().getHours();
+                    return hour >= 18 || hour < 5;
+                },
+                build: ({ percent, countdownHTML }) => `
+                    <div class="space-y-4 animate-fade-in-up">
+                        <p class="text-pink-300 text-sm font-black uppercase tracking-[0.3em]">You&rsquo;re checking party tickets at night?</p>
+                        <h2 class="text-2xl font-black italic uppercase leading-tight">That is not ordinary browsing.</h2>
+                        <p class="text-sm font-bold text-slate-300">LaBaNi has matched your energy.</p>
+                        <div class="bg-white/10 border border-white/10 rounded-2xl p-4">
+                            <p class="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Night Owl Last Born Reward Unlocked</p>
+                            <p class="text-3xl font-black text-white">${percent}% OFF</p>
+                            <p class="text-sm font-bold text-slate-300">Extra discount valid for ${countdownHTML}.</p>
+                        </div>
+                    </div>
+                `,
+                button: ({ percent }) => `Claim My ${percent}% Reward`,
+                footnote: 'Not every visitor sees this.'
+            },
+            {
+                id: 'early-bird',
+                applies: () => {
+                    const hour = new Date().getHours();
+                    return hour >= 5 && hour < 12;
+                },
+                build: ({ percent, countdownHTML }) => `
+                    <div class="space-y-4 animate-fade-in-up">
+                        <p class="text-pink-300 text-sm font-black uppercase tracking-[0.3em]">You came early.</p>
+                        <h2 class="text-2xl font-black italic uppercase leading-tight">That&rsquo;s exactly how Last Borns secure the best treatment.</h2>
+                        <div class="bg-white/10 border border-white/10 rounded-2xl p-4">
+                            <p class="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Early Bird Last Born Pass</p>
+                            <p class="text-3xl font-black text-white">${percent}% OFF</p>
+                            <p class="text-sm font-bold text-slate-300">Discount active for this session only.</p>
+                            ${countdownHTML}
+                        </div>
+                    </div>
+                `,
+                button: ({ percent }) => `Claim My ${percent}% Reward`,
+                footnote: 'Not every visitor sees this.'
+            }
         ];
 
         // --- APPLICATION STATE ---
@@ -426,9 +546,11 @@
             activeGuestId: null,
             isProcessing: false,
             checkoutComplete: false,
+            acceptedLegal: false,
             manageLookup: { phone: '', passId: '', error: '', ticket: null, selectedZones: [], processing: false, complete: false, addedZones: [] },
             
             currentSlide: 0,
+            zoneSlide: 0,
             notifIndex: 0,
             showNotif: false,
         };
@@ -436,9 +558,14 @@
         state.activeGuestId = state.guests[0].id;
 
         let slideInterval;
+        let zoneSlideInterval;
         let notifInterval;
         let discountInterval;
         let heroRevealTimeout;
+        let zoneRevealTimeout;
+        let introRewardInterval;
+        let sessionIntroReward = null;
+        let lastEntryDealSignature = '';
         let scannerStream = null;
         let scannerFrame = null;
         let deferredInstallPrompt = null;
@@ -500,6 +627,134 @@
             lucide.createIcons();
         };
 
+        const hideLaBaniIntro = () => {
+            const intro = document.getElementById('labani-intro');
+            if (!intro) return;
+            clearInterval(introRewardInterval);
+            intro.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                intro.classList.add('hidden');
+                updateInstallPromptVisibility();
+            }, 700);
+        };
+
+        const getRandomInt = (min, max) => {
+            const range = max - min + 1;
+            const randomValue = new Uint32Array(1);
+            crypto.getRandomValues(randomValue);
+            return min + (randomValue[0] % range);
+        };
+
+        const getIntroRewardDecision = () => {
+            try {
+                return localStorage.getItem(INTRO_REWARD_DECISION_KEY);
+            } catch {
+                return null;
+            }
+        };
+
+        const setIntroRewardDecision = (decision) => {
+            try {
+                localStorage.setItem(INTRO_REWARD_DECISION_KEY, decision);
+            } catch {}
+        };
+
+        const shouldShowIntroReward = () => {
+            if (getIntroRewardDecision()) return false;
+
+            const selected = Math.random() < INTRO_REWARD_SHOW_RATE;
+            setIntroRewardDecision(selected ? 'shown' : 'skipped');
+            return selected;
+        };
+
+        const isNigeriaVisitor = () => {
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+            const language = navigator.language || '';
+            return /lagos/i.test(timeZone) || /ng/i.test(language);
+        };
+
+        const formatRewardCountdown = (expiresAt) => {
+            const diff = Math.max(0, expiresAt - new Date());
+            const minutes = Math.floor(diff / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        };
+
+        const buildRewardCountdownHTML = () => {
+            return `<p class="text-xs font-black text-red-200 mt-3">Valid for the next <span id="intro-reward-countdown">${formatRewardCountdown(sessionIntroReward.expiresAt)}</span> only.</p>`;
+        };
+
+        const createSessionIntroReward = () => {
+            const scheduledDeal = getScheduledEntryDiscount();
+            const minPercent = Math.min(MAX_REWARD_PERCENT, Math.max(MIN_REWARD_PERCENT, scheduledDeal.discountPercent));
+            const percent = getRandomInt(minPercent, MAX_REWARD_PERCENT);
+            const visitorNumber = percent;
+            const applicableVariants = INTRO_REWARD_VARIANTS.filter(variant => variant.applies());
+            const variant = applicableVariants[getRandomInt(0, applicableVariants.length - 1)] || INTRO_REWARD_VARIANTS[0];
+            return {
+                percent,
+                visitorNumber,
+                variant,
+                expiresAt: new Date(Date.now() + INTRO_REWARD_DURATION_MS)
+            };
+        };
+
+        const renderIntroReward = () => {
+            const copy = document.getElementById('labani-intro-copy');
+            if (!copy || !sessionIntroReward) return;
+
+            const data = {
+                percent: sessionIntroReward.percent,
+                visitorNumber: sessionIntroReward.visitorNumber,
+                countdownHTML: buildRewardCountdownHTML()
+            };
+
+            copy.className = 'min-h-[18rem] flex flex-col items-center justify-center gap-4';
+            copy.innerHTML = `
+                ${sessionIntroReward.variant.build(data)}
+                <button onclick="claimIntroReward()" class="w-full bg-pink-600 text-white font-black italic text-base py-4 rounded-2xl shadow-xl shadow-pink-500/20 active:scale-95 transition-transform animate-fade-in-up delay-300">
+                    ${sessionIntroReward.variant.button(data)}
+                </button>
+                <p class="text-[11px] text-slate-400 font-bold animate-fade-in-up delay-400">${sessionIntroReward.variant.footnote}</p>
+            `;
+            lucide.createIcons();
+            updateHeaderDealBadge();
+        };
+
+        const updateIntroRewardCountdown = () => {
+            const countdown = document.getElementById('intro-reward-countdown');
+            if (countdown && sessionIntroReward) countdown.innerText = formatRewardCountdown(sessionIntroReward.expiresAt);
+            if (sessionIntroReward && new Date() >= sessionIntroReward.expiresAt) {
+                clearInterval(introRewardInterval);
+                updateEntryDealDisplays();
+            }
+        };
+
+        const runLaBaniIntro = () => {
+            const intro = document.getElementById('labani-intro');
+            if (!intro) {
+                updateInstallPromptVisibility();
+                return;
+            }
+
+            if (!shouldShowIntroReward()) {
+                intro.classList.add('hidden');
+                updateInstallPromptVisibility();
+                return;
+            }
+
+            sessionIntroReward = createSessionIntroReward();
+            renderIntroReward();
+            clearInterval(introRewardInterval);
+            introRewardInterval = setInterval(updateIntroRewardCountdown, 1000);
+            lucide.createIcons();
+        };
+
+        window.claimIntroReward = () => {
+            hideLaBaniIntro();
+            render();
+        };
+
         window.installLaBaniApp = async () => {
             if (!deferredInstallPrompt) return;
             deferredInstallPrompt.prompt();
@@ -521,7 +776,7 @@
             return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(amount);
         };
 
-        const getEntryDiscount = () => {
+        const getScheduledEntryDiscount = () => {
             const now = new Date();
             const elapsedMs = Math.max(0, now - DISCOUNT_START_DATE);
             const elapsedDays = Math.floor(elapsedMs / 86400000);
@@ -530,6 +785,23 @@
             const nextDropAt = new Date(DISCOUNT_START_DATE.getTime() + ((elapsedDays + 1) * 86400000));
             const nextDiscountPercent = Math.max(0, discountPercent - DAILY_DISCOUNT_DROP);
             return { elapsedDays, discountPercent, currentPrice, nextDropAt, nextDiscountPercent };
+        };
+
+        const getEntryDiscount = () => {
+            const scheduledDeal = getScheduledEntryDiscount();
+            const rewardActive = sessionIntroReward && new Date() < sessionIntroReward.expiresAt;
+
+            if (!rewardActive || sessionIntroReward.percent <= scheduledDeal.discountPercent) {
+                return scheduledDeal;
+            }
+
+            return {
+                ...scheduledDeal,
+                discountPercent: sessionIntroReward.percent,
+                currentPrice: Math.round(ORIGINAL_ENTRY_FEE * (100 - sessionIntroReward.percent) / 100),
+                nextDropAt: sessionIntroReward.expiresAt,
+                nextDiscountPercent: scheduledDeal.discountPercent
+            };
         };
 
         const getHeaderDealBadgeHTML = () => {
@@ -542,9 +814,31 @@
             `;
         };
 
+        const getEntryDealSignature = () => {
+            const deal = getEntryDiscount();
+            return `${deal.discountPercent}|${deal.currentPrice}|${deal.nextDropAt.getTime()}`;
+        };
+
         const updateHeaderDealBadge = () => {
             document.querySelectorAll('[data-entry-deal-badge]').forEach(badge => {
                 badge.outerHTML = getHeaderDealBadgeHTML();
+            });
+        };
+
+        const updateEntryDealDisplays = () => {
+            const deal = getEntryDiscount();
+            updateHeaderDealBadge();
+            document.querySelectorAll('[data-entry-deal-percent]').forEach(el => {
+                el.innerText = `${deal.discountPercent}% OFF`;
+            });
+            document.querySelectorAll('[data-entry-deal-current]').forEach(el => {
+                el.innerText = formatCurrency(deal.currentPrice);
+            });
+            document.querySelectorAll('[data-entry-deal-next-percent]').forEach(el => {
+                el.innerText = `${deal.nextDiscountPercent}%`;
+            });
+            document.querySelectorAll('[data-entry-deal-countdown]').forEach(el => {
+                el.innerText = formatTimeLeft(deal.nextDropAt);
             });
         };
 
@@ -848,7 +1142,7 @@
         };
 
         const isCheckoutValid = () => {
-            return state.guests.every(g => g.name.trim() !== '' && g.phone.trim() !== '');
+            return state.acceptedLegal && state.guests.every(g => g.name.trim() !== '' && g.phone.trim() !== '');
         };
 
         // --- STATE MODIFICATION FUNCTIONS ---
@@ -884,6 +1178,11 @@
             }
         };
 
+        window.toggleLegalConsent = (checked) => {
+            state.acceptedLegal = checked;
+            updateCheckoutTotals();
+        };
+
         window.toggleActivity = (activityId) => {
             const guest = getActiveGuest();
             if (guest.isVip) return;
@@ -896,11 +1195,16 @@
             renderActivitiesView();
         };
 
+        window.goToZoneSlide = (index) => {
+            state.zoneSlide = index;
+            renderActivitiesView();
+        };
+
         window.toggleVip = () => {
             const guest = getActiveGuest();
             guest.isVip = !guest.isVip;
             if (guest.isVip) {
-                guest.selectedActivities = RESORT_ACTIVITIES.map(a => a.id);
+                 guest.selectedActivities = RESORT_ACTIVITIES.map(a => a.id);
             } else {
                 guest.selectedActivities = [];
             }
@@ -1060,6 +1364,7 @@
 
         window.startNewBooking = () => {
             state.checkoutComplete = false;
+            state.acceptedLegal = false;
             state.guests = [{ id: 'g' + Date.now(), name: '', phone: '', isVip: false, selectedActivities: [] }];
             state.activeGuestId = state.guests[0].id;
             window.switchTab('home');
@@ -1196,9 +1501,11 @@
             const contextBanner = document.getElementById('context-banner');
             
             clearInterval(slideInterval);
+            clearInterval(zoneSlideInterval);
             clearInterval(notifInterval);
             clearInterval(discountInterval);
             clearTimeout(heroRevealTimeout);
+            clearTimeout(zoneRevealTimeout);
 
             if (location.hash === '#tickets' && !state.checkoutComplete) {
                 state.activeTab = 'checkout';
@@ -1247,11 +1554,8 @@
                                 LaBaNi <i data-lucide="party-popper" class="text-pink-500 w-6 h-6 not-italic animate-bounce"></i>
                             </h1>
                         </div>
-                        <div class="flex items-center gap-2 animate-slide-in-right delay-100">
+                        <div class="animate-slide-in-right delay-100">
                             ${getHeaderDealBadgeHTML()}
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-yellow-400 p-[2px] shadow-md shadow-pink-200 glow-effect hover:scale-110 transition-transform cursor-pointer">
-                                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="LaBaNi 2026 VIP guest profile for the Last Born Association exclusive Abuja party" title="LaBaNi VIP guest, Last Born Association, Abuja exclusive party, Naija spenders" class="w-full h-full rounded-full object-cover border-2 border-white"/>
-                            </div>
                         </div>
                     </div>
                 `;
@@ -1278,6 +1582,7 @@
             }
 
             lucide.createIcons();
+            lastEntryDealSignature = getEntryDealSignature();
         }
 
         function updateNavUI() {
@@ -1327,6 +1632,27 @@
         function scheduleHeroReveal(slideIndex) {
             clearTimeout(heroRevealTimeout);
             heroRevealTimeout = setTimeout(() => revealHeroCaption(slideIndex), HERO_REVEAL_DELAY);
+        }
+
+        const ZONE_REVEAL_DELAY = 1200;
+        const zoneOverlayHiddenClass = 'absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent opacity-0 transition-opacity duration-700';
+        const zoneOverlayVisibleClass = 'absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent opacity-100 transition-opacity duration-700';
+        const zoneCopyHiddenClass = 'absolute bottom-0 left-0 right-0 p-5 text-white opacity-0 translate-y-4 transition-all duration-700';
+        const zoneCopyVisibleClass = 'absolute bottom-0 left-0 right-0 p-5 text-white opacity-100 translate-y-0 transition-all duration-700';
+
+        function revealZoneCaption(slideIndex) {
+            const overlay = document.getElementById(`zone-slide-overlay-${slideIndex}`);
+            const copy = document.getElementById(`zone-slide-copy-${slideIndex}`);
+
+            if (!overlay || !copy || state.activeTab !== 'activities') return;
+
+            overlay.className = zoneOverlayVisibleClass;
+            copy.className = zoneCopyVisibleClass;
+        }
+
+        function scheduleZoneReveal(slideIndex) {
+            clearTimeout(zoneRevealTimeout);
+            zoneRevealTimeout = setTimeout(() => revealZoneCaption(slideIndex), ZONE_REVEAL_DELAY);
         }
 
         function renderHomeView() {
@@ -1414,7 +1740,7 @@
 
                         <div class="grid grid-cols-3 gap-3 animate-fade-in-up delay-200">
                             <div class="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm hover:-translate-y-1 transition-transform">
-                                <p class="text-2xl font-black text-slate-800">7</p>
+                                <p class="text-2xl font-black text-slate-800">6</p>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase mt-1">Resort Zones</p>
                             </div>
                             <div class="bg-white border border-slate-100 rounded-2xl p-4 text-center shadow-sm hover:-translate-y-1 transition-transform">
@@ -1440,13 +1766,13 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <p class="text-xs text-pink-600 font-bold uppercase tracking-wider">Base Entry Deal</p>
-                                        <span class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">${entryDeal.discountPercent}% OFF</span>
+                                        <span data-entry-deal-percent class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">${entryDeal.discountPercent}% OFF</span>
                                     </div>
                                     <div class="flex items-end gap-2 flex-wrap">
-                                        <p class="text-xl font-black text-slate-900">${formatCurrency(entryDeal.currentPrice)}</p>
+                                        <p data-entry-deal-current class="text-xl font-black text-slate-900">${formatCurrency(entryDeal.currentPrice)}</p>
                                         <p class="text-sm font-black text-slate-400 line-through">${formatCurrency(ORIGINAL_ENTRY_FEE)}</p>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 mt-1">Discount drops to ${entryDeal.nextDiscountPercent}% in <span id="discount-countdown" class="font-black text-red-600">${formatTimeLeft(entryDeal.nextDropAt)}</span></p>
+                                    <p class="text-[10px] text-slate-500 mt-1">Discount drops to <span data-entry-deal-next-percent>${entryDeal.nextDiscountPercent}%</span> in <span id="discount-countdown" data-entry-deal-countdown class="font-black text-red-600">${formatTimeLeft(entryDeal.nextDropAt)}</span></p>
                                 </div>
                             </div>
                         </div>
@@ -1538,24 +1864,49 @@
             }, 9000);
 
             discountInterval = setInterval(() => {
-                const countdown = document.getElementById('discount-countdown');
                 const deal = getEntryDiscount();
-                if (countdown) countdown.innerText = formatTimeLeft(deal.nextDropAt);
+                const dealSignature = getEntryDealSignature();
+                if (lastEntryDealSignature && dealSignature !== lastEntryDealSignature) {
+                    lastEntryDealSignature = dealSignature;
+                    render();
+                    return;
+                }
+                updateEntryDealDisplays();
                 document.querySelectorAll('.zone-discount-countdown').forEach(el => {
                     el.innerText = formatTimeLeft(deal.nextDropAt);
                 });
                 document.querySelectorAll('.vip-discount-countdown').forEach(el => {
                     el.innerText = formatTimeLeft(deal.nextDropAt);
                 });
-                updateHeaderDealBadge();
             }, 1000);
         }
 
         function renderActivitiesView() {
+            clearInterval(zoneSlideInterval);
+            clearTimeout(zoneRevealTimeout);
             const container = document.getElementById('main-content');
             const guest = getActiveGuest();
             const guestName = guest.name || 'this guest';
             const zoneDeal = getEntryDiscount();
+
+            const zoneSlidesHTML = ZONE_SLIDER_MEDIA.map((media, index) => `
+                <div id="zone-slide-${index}" class="absolute inset-0 transition-opacity duration-700 ${index === state.zoneSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}">
+                    <img src="${media.src}" alt="${media.description}" title="${media.keywords}" data-seo-keywords="${media.keywords}" loading="${index === state.zoneSlide ? 'eager' : 'lazy'}" class="w-full h-full object-cover transform transition-transform duration-[5000ms] ease-linear ${index === state.zoneSlide ? 'scale-105' : 'scale-100'}" />
+                    <div id="zone-slide-overlay-${index}" class="${zoneOverlayHiddenClass}"></div>
+                    <div id="zone-slide-copy-${index}" class="${zoneCopyHiddenClass}">
+                        <div class="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-md border border-white/20 rounded-full px-3 py-1 mb-2">
+                            <i data-lucide="sparkles" class="w-3 h-3 text-yellow-300"></i>
+                            <span class="text-[10px] font-black uppercase tracking-widest">Zone Preview</span>
+                        </div>
+                        <h3 class="text-2xl font-black italic uppercase leading-none drop-shadow-md">${media.label}</h3>
+                        <p class="text-xs font-semibold text-slate-100 mt-1 leading-snug max-w-[18rem]">${media.description}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            const zoneDotsHTML = ZONE_SLIDER_MEDIA.map((media, idx) => `
+                <button type="button" onclick="goToZoneSlide(${idx})" aria-label="Show ${media.label}" id="zone-dot-${idx}" class="h-1.5 rounded-full transition-all duration-300 ${idx === state.zoneSlide ? 'w-6 bg-pink-500' : 'w-2 bg-white/60'}"></button>
+            `).join('');
             
             let activitiesHTML = RESORT_ACTIVITIES.map((activity, idx) => {
                 const isSelected = guest.selectedActivities.includes(activity.id);
@@ -1597,6 +1948,13 @@
 
             container.innerHTML = `
                 <div class="p-6 space-y-6">
+                    <div class="relative h-56 rounded-3xl overflow-hidden bg-slate-900 shadow-xl shadow-slate-200/60 border border-slate-100 animate-fade-in-up">
+                        ${zoneSlidesHTML}
+                        <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-black/20 backdrop-blur-md rounded-full px-2 py-1">
+                            ${zoneDotsHTML}
+                        </div>
+                    </div>
+
                     <div class="animate-fade-in-up">
                         <h2 class="text-2xl font-black text-slate-900 italic tracking-tight uppercase">Resort Activities</h2>
                         <p class="text-slate-500 text-sm font-medium mt-1">Customize vibes for <span class="text-slate-800 font-bold">${guestName}</span>.</p>
@@ -1613,6 +1971,38 @@
                     </div>
                 </div>
             `;
+
+            scheduleZoneReveal(state.zoneSlide);
+
+            zoneSlideInterval = setInterval(() => {
+                const prev = state.zoneSlide;
+                state.zoneSlide = (state.zoneSlide + 1) % ZONE_SLIDER_MEDIA.length;
+
+                const prevSlide = document.getElementById(`zone-slide-${prev}`);
+                const nextSlide = document.getElementById(`zone-slide-${state.zoneSlide}`);
+                const prevOverlay = document.getElementById(`zone-slide-overlay-${prev}`);
+                const nextOverlay = document.getElementById(`zone-slide-overlay-${state.zoneSlide}`);
+                const prevCopy = document.getElementById(`zone-slide-copy-${prev}`);
+                const nextCopy = document.getElementById(`zone-slide-copy-${state.zoneSlide}`);
+                const prevDot = document.getElementById(`zone-dot-${prev}`);
+                const nextDot = document.getElementById(`zone-dot-${state.zoneSlide}`);
+                if (!prevSlide || !nextSlide || state.activeTab !== 'activities') return;
+
+                prevSlide.className = 'absolute inset-0 transition-opacity duration-700 opacity-0 z-0';
+                nextSlide.className = 'absolute inset-0 transition-opacity duration-700 opacity-100 z-10';
+                if (prevOverlay) prevOverlay.className = zoneOverlayHiddenClass;
+                if (nextOverlay) nextOverlay.className = zoneOverlayHiddenClass;
+                if (prevCopy) prevCopy.className = zoneCopyHiddenClass;
+                if (nextCopy) nextCopy.className = zoneCopyHiddenClass;
+                const prevImg = prevSlide.querySelector('img');
+                const nextImg = nextSlide.querySelector('img');
+                if (prevImg) prevImg.className = 'w-full h-full object-cover transform transition-transform duration-[5000ms] ease-linear scale-100';
+                if (nextImg) nextImg.className = 'w-full h-full object-cover transform transition-transform duration-[5000ms] ease-linear scale-105';
+                if (prevDot) prevDot.className = 'h-1.5 rounded-full transition-all duration-300 w-2 bg-white/60';
+                if (nextDot) nextDot.className = 'h-1.5 rounded-full transition-all duration-300 w-6 bg-pink-500';
+                scheduleZoneReveal(state.zoneSlide);
+            }, 4500);
+
             lucide.createIcons();
         }
 
@@ -1648,7 +2038,7 @@
                                 DON OF<br/>LAST BORNS
                             </h2>
                             <p class="text-slate-400 text-sm mb-8 leading-relaxed">
-                                The ultimate flex for <span class="text-white font-bold">${guestName}</span>. Skip the lines, access all 7 resort zones, premium bottle service, and absolute royalty treatment.
+                                The ultimate flex for <span class="text-white font-bold">${guestName}</span>. Skip the lines, access all 6 resort zones, premium bottle service, and absolute royalty treatment.
                             </p>
 
                             <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 mb-8 border border-white/10 hover:border-yellow-400/50 transition-colors blink-deal">
@@ -2091,6 +2481,16 @@
                         <p class="text-xs text-slate-400 font-medium text-center mt-5 relative z-10">Make a single transfer before confirming.</p>
                     </div>
 
+                    <label class="flex items-start gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm animate-fade-in-up delay-400 cursor-pointer">
+                        <input type="checkbox" ${state.acceptedLegal ? 'checked' : ''} onchange="toggleLegalConsent(this.checked)" class="mt-1 h-5 w-5 rounded border-slate-300 text-pink-600 accent-pink-600 focus:ring-pink-500 shrink-0">
+                        <span class="text-xs text-slate-600 font-semibold leading-relaxed">
+                            I agree to the
+                            <a href="terms.html" target="_blank" rel="noopener noreferrer" class="text-pink-600 font-black underline decoration-pink-200 underline-offset-2">Terms & Conditions</a>
+                            and acknowledge the
+                            <a href="privacy.html" target="_blank" rel="noopener noreferrer" class="text-pink-600 font-black underline decoration-pink-200 underline-offset-2">Privacy Statement</a>.
+                        </span>
+                    </label>
+
                     <div class="pt-2 animate-fade-in-up delay-400" id="checkout-btn-container">
                         <!-- Button injected here -->
                     </div>
@@ -2118,7 +2518,7 @@
 
             let btnContent = processing 
                 ? `<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>` 
-                : `<i data-lucide="check-circle-2" class="w-6 h-6"></i> ${valid ? 'I Have Transferred' : 'Fill All Names to Pay'}`;
+                : `<i data-lucide="check-circle-2" class="w-6 h-6"></i> ${valid ? 'I Have Transferred' : (state.acceptedLegal ? 'Fill All Names to Pay' : 'Accept Terms to Pay')}`;
 
             const activeClass = valid ? "bg-pink-600 shadow-xl shadow-pink-500/20 hover:scale-[1.02] active:scale-[0.98] glow-effect" : "bg-slate-200 text-slate-400 cursor-not-allowed";
 
@@ -2132,53 +2532,105 @@
 
         function getReceiptsHTML() {
             let receiptsHTML = state.guests.map((guest, idx) => {
-                let accessListHTML = `<li class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-500"></i> Kintik Resort Grounds</li>`;
+                const checkIconClass = guest.isVip ? 'text-yellow-300' : 'text-emerald-500';
+                let accessListHTML = `<li class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3 h-3 ${checkIconClass}"></i> Kintik Resort Grounds</li>`;
                 
                 if (guest.isVip) {
-                    accessListHTML += `<li class="flex items-center gap-1.5 animate-slide-in-right"><i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-500"></i> All 7 Premium Zones</li>`;
+                    accessListHTML += `<li class="flex items-center gap-1.5 animate-slide-in-right"><i data-lucide="check-circle-2" class="w-3 h-3 ${checkIconClass}"></i> All 6 Premium Zones</li>`;
                 } else {
                     accessListHTML += guest.selectedActivities.map((id, actIdx) => {
                         const act = RESORT_ACTIVITIES.find(a => a.id === id);
-                        return act ? `<li class="flex items-center gap-1.5 animate-slide-in-right" style="animation-delay: ${actIdx * 100}ms"><i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-500"></i> ${act.name}</li>` : '';
+                        return act ? `<li class="flex items-center gap-1.5 animate-slide-in-right" style="animation-delay: ${actIdx * 100}ms"><i data-lucide="check-circle-2" class="w-3 h-3 ${checkIconClass}"></i> ${act.name}</li>` : '';
                     }).join('');
                 }
 
                 const badge = guest.isVip 
-                    ? `<div class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 border border-yellow-200 shadow-sm"><i data-lucide="crown" class="w-3 h-3 animate-pulse"></i> VIP DON</div>`
+                    ? `<div class="bg-yellow-300 text-slate-950 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 border border-yellow-100 shadow-lg shadow-yellow-900/20"><i data-lucide="crown" class="w-3 h-3 animate-pulse"></i> VIP DON</div>`
                     : `<div class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-slate-200 shadow-sm">Standard</div>`;
+
+                const receiptCardClass = guest.isVip
+                    ? 'bg-gradient-to-br from-slate-950 via-fuchsia-950 to-yellow-700 text-white rounded-2xl shadow-2xl shadow-yellow-200/70 border-2 border-yellow-300 overflow-hidden relative'
+                    : 'bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden relative';
+                const topSectionClass = guest.isVip
+                    ? 'relative z-10 p-5 border-b border-dashed border-yellow-200/50'
+                    : 'p-5 border-b border-dashed border-slate-300';
+                const passClass = guest.isVip
+                    ? 'text-[10px] text-yellow-300 font-black uppercase tracking-widest mb-1'
+                    : 'text-[10px] text-pink-500 font-black uppercase tracking-widest mb-1';
+                const nameClass = guest.isVip
+                    ? 'font-black text-2xl text-white uppercase leading-none drop-shadow-md'
+                    : 'font-black text-xl text-slate-800 uppercase leading-none';
+                const phoneClass = guest.isVip
+                    ? 'text-xs text-yellow-100 mt-1 flex items-center gap-1'
+                    : 'text-xs text-slate-500 mt-1 flex items-center gap-1';
+                const accessBoxClass = guest.isVip
+                    ? 'bg-white/10 rounded-xl p-3 border border-yellow-200/30 text-sm backdrop-blur-sm'
+                    : 'bg-slate-50 rounded-xl p-3 border border-slate-100 text-sm';
+                const accessTitleClass = guest.isVip
+                    ? 'text-[10px] font-bold text-yellow-200 uppercase tracking-wider mb-1'
+                    : 'text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1';
+                const accessListClass = guest.isVip
+                    ? 'text-white font-semibold space-y-1'
+                    : 'text-slate-700 font-medium space-y-1';
+                const scanSectionClass = guest.isVip
+                    ? 'relative z-10 p-5 bg-yellow-300/95 text-slate-950 flex items-center justify-between'
+                    : 'p-5 bg-slate-50 flex items-center justify-between';
+                const scanLabelClass = guest.isVip
+                    ? 'text-[10px] font-black text-fuchsia-900 uppercase tracking-wider mb-0.5'
+                    : 'text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5';
+                const scanTextClass = guest.isVip
+                    ? 'text-sm font-black text-slate-950 italic tracking-widest'
+                    : 'text-sm font-black text-slate-800 italic tracking-widest';
+                const qrBoxClass = guest.isVip
+                    ? 'w-24 h-24 bg-white p-1.5 rounded-xl border-2 border-slate-950 shadow-xl hover:scale-110 transition-transform cursor-crosshair'
+                    : 'w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 shadow-sm hover:scale-110 transition-transform cursor-crosshair';
+                const vipHeaderHTML = guest.isVip ? `
+                        <div class="relative z-10 bg-gradient-to-r from-yellow-300 via-pink-400 to-fuchsia-500 text-slate-950 px-5 py-3 flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-[9px] font-black uppercase tracking-widest">Don of Last Borns</p>
+                                <p class="text-xs font-black uppercase">Premium all-zone access</p>
+                            </div>
+                            <i data-lucide="sparkles" class="w-6 h-6"></i>
+                        </div>
+                ` : '';
 
                 return `
                 <div class="mb-8 animate-fade-in-up" style="animation-delay: ${(idx + 1) * 150}ms">
-                    <div id="receipt-card-${guest.id}" class="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden relative">
+                    <div id="receipt-card-${guest.id}" class="${receiptCardClass}">
+                        ${guest.isVip ? `
+                            <div class="absolute -top-16 -right-14 w-40 h-40 bg-yellow-300/25 rounded-full blur-2xl"></div>
+                            <div class="absolute -bottom-12 -left-10 w-36 h-36 bg-pink-500/30 rounded-full blur-2xl"></div>
+                        ` : ''}
                         <!-- Decorative jagged edge -->
                         <div class="absolute top-0 left-0 right-0 h-2 flex space-x-1 overflow-hidden opacity-20">
-                            ${Array(20).fill(0).map(() => `<div class="w-2 h-2 bg-slate-800 rounded-full -mt-1"></div>`).join('')}
+                            ${Array(20).fill(0).map(() => `<div class="w-2 h-2 ${guest.isVip ? 'bg-yellow-200' : 'bg-slate-800'} rounded-full -mt-1"></div>`).join('')}
                         </div>
+                        ${vipHeaderHTML}
                         
-                        <div class="p-5 border-b border-dashed border-slate-300">
+                        <div class="${topSectionClass}">
                             <div class="flex justify-between items-start mb-4">
                                 <div>
-                                    <p class="text-[10px] text-pink-500 font-black uppercase tracking-widest mb-1">Pass #${guest.passId}</p>
-                                    <h3 class="font-black text-xl text-slate-800 uppercase leading-none">${guest.name}</h3>
-                                    <p class="text-xs text-slate-500 mt-1 flex items-center gap-1"><i data-lucide="phone" class="w-[10px] h-[10px]"></i> ${guest.phone}</p>
+                                    <p class="${passClass}">Pass #${guest.passId}</p>
+                                    <h3 class="${nameClass}">${guest.name}</h3>
+                                    <p class="${phoneClass}"><i data-lucide="phone" class="w-[10px] h-[10px]"></i> ${guest.phone}</p>
                                 </div>
                                 ${badge}
                             </div>
 
-                            <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 text-sm">
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Access Granted For:</p>
-                                <ul class="text-slate-700 font-medium space-y-1">
+                            <div class="${accessBoxClass}">
+                                <p class="${accessTitleClass}">Access Granted For:</p>
+                                <ul class="${accessListClass}">
                                     ${accessListHTML}
                                 </ul>
                             </div>
                         </div>
 
-                        <div class="p-5 bg-slate-50 flex items-center justify-between">
+                        <div class="${scanSectionClass}">
                             <div>
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">LaBaNi Event</p>
-                                <p class="text-sm font-black text-slate-800 italic tracking-widest">SCAN AT GATE</p>
+                                <p class="${scanLabelClass}">LaBaNi Event</p>
+                                <p class="${scanTextClass}">SCAN AT GATE</p>
                             </div>
-                            <div class="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 shadow-sm hover:scale-110 transition-transform cursor-crosshair">
+                            <div class="${qrBoxClass}">
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(ticketPayload(guest))}" alt="Ticket QR for ${guest.name}" class="w-full h-full object-contain" crossorigin="anonymous" />
                             </div>
                         </div>
@@ -2332,7 +2784,7 @@
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
             render();
-            updateInstallPromptVisibility();
+            runLaBaniIntro();
         });
 
         window.addEventListener('hashchange', () => {
