@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">LaBaNi 2026 app icon</title>
+  <desc id="desc">Pink, gold and black LaBaNi party icon for the Last Born Association of Nigeria 2026 exclusive Abuja party.</desc>
+  <defs>
+    <linearGradient id="bg" x1="80" y1="60" x2="440" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ec4899"/>
+      <stop offset="0.52" stop-color="#db2777"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="62%">
+      <stop offset="0" stop-color="#fff7ed" stop-opacity="0.9"/>
+      <stop offset="0.38" stop-color="#fef3c7" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#020617"/>
+  <rect x="34" y="34" width="444" height="444" rx="92" fill="url(#bg)"/>
+  <circle cx="256" cy="190" r="185" fill="url(#glow)"/>
+  <path d="M139 311c47-85 94-128 142-128 40 0 71 28 92 84 16-25 34-44 54-57l27 46c-31 19-53 55-66 108h-56c-15-82-36-123-64-123-25 0-54 34-87 102l-7 15h-58l23-47Z" fill="#fff" opacity="0.96"/>
+  <text x="256" y="407" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="900" fill="#fff" letter-spacing="2">LB</text>
+  <text x="256" y="458" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="900" fill="#fff7ed" letter-spacing="5">2026</text>
+</svg>
