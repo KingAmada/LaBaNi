@@ -137,6 +137,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* CSS Reset & scrollbar hide for clean mobile look */
@@ -314,13 +315,18 @@
     <!-- Application Logic -->
     <script>
         // --- CONSTANTS & DATA ---
-        const ORIGINAL_ENTRY_FEE = 100000;
-        const DISCOUNT_START_DATE = new Date('2026-05-29T00:00:00+01:00');
-        const STARTING_DISCOUNT_PERCENT = 50;
-        const DAILY_DISCOUNT_DROP = 2;
-        const ADDITIONAL_GUEST_DISCOUNT_PERCENT = 20;
-        const ORIGINAL_VIP_FEE = 1000000;
-        const TOTAL_VIP_SLOTS = 10;
+        const SUPABASE_URL = 'https://acqypknpiqxtavzjqhpo.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjcXlwa25waXF4dGF2empxaHBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDM5MzUsImV4cCI6MjA5NTgxOTkzNX0.kFxt6138r8eY5veJDW4A4VeYkZHW5K14jR3AwDqKT2s';
+        const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let databaseOnline = false;
+
+        let ORIGINAL_ENTRY_FEE = 100000;
+        let DISCOUNT_START_DATE = new Date('2026-05-29T00:00:00+01:00');
+        let STARTING_DISCOUNT_PERCENT = 50;
+        let DAILY_DISCOUNT_DROP = 2;
+        let ADDITIONAL_GUEST_DISCOUNT_PERCENT = 20;
+        let ORIGINAL_VIP_FEE = 1000000;
+        let TOTAL_VIP_SLOTS = 10;
         const EVENT_CODE = 'LABANI-KINTIK-2026';
         const STORAGE_KEYS = {
             tickets: 'labani_issued_tickets_v1',
@@ -328,7 +334,7 @@
         };
         const RESORT_GROUNDS = { id: 'grounds', name: 'Kintik Resort Grounds', icon: 'map-pin' };
 
-        const RESORT_ACTIVITIES = [
+        let RESORT_ACTIVITIES = [
             {
                 id: 'a1',
                 name: 'Nightclub',
@@ -391,7 +397,7 @@
             },
         ];
 
-        const VIP_PERKS = [
+        let VIP_PERKS = [
             "Unrestricted access to all 6 Resort Zones",
             "Premium bottle service & bottomless drinks",
             "Dedicated personal concierge for the night",
@@ -399,7 +405,7 @@
             "Skip-the-line privileges across the resort"
         ];
 
-        const HERO_MEDIA = [
+        let HERO_MEDIA = [
             { id: 1, src: 'assets/trampoline-foam-pit-group Large.jpeg', hook: 'Are you truly a last born if you’re not at LaBaNi?', alt: 'LaBaNi 2026 playhouse foam pit group with Last Born Association party guests enjoying premium resort games.', keywords: 'LaBaNi, Last Born Association, playhouse, Naija party games' },
             { id: 2, src: 'assets/trampoline-flip-foam-pit Large.jpeg', hook: 'Last borns deserve the full experience. Not the stories.', alt: 'Trampoline and foam pit action for LaBaNi 2026 guests, showing energetic Last Born Association fun before the big Abuja party.', keywords: 'LaBaNi 2026, trampoline, Abuja party, Last Born fun' },
             { id: 3, src: 'assets/foam-pit-party-group Large.jpeg', hook: 'Last borns were made to enjoy life. Stop suffering and enter.', alt: 'LaBaNi foam pit party group posing inside the playhouse zone for rich Naija last borns and exclusive party guests.', keywords: 'LaBaNi party, last borns, Naija, exclusive party' },
@@ -412,7 +418,7 @@
             { id: 10, src: 'assets/restaurant-lounge-dining Large.jpeg', hook: 'The resort is ready. The question is, are you?', alt: 'LaBaNi restaurant lounge dining scene with VIP guests, Naija social energy and premium Abuja resort party setting.', keywords: 'LaBaNi lounge, restaurant, Abuja resort party, VIP dining' }
         ];
 
-        const ZONE_SLIDER_MEDIA = [
+        let ZONE_SLIDER_MEDIA = [
             { id: 1, src: 'assets/pool-party-resort Large.jpeg', label: 'Pool Side', description: 'Wet and wild resort energy with cabanas, swimwear and premium LaBaNi pool party vibes.', keywords: 'LaBaNi pool party, Abuja pool side, Kintik Resort cabana, premium Naija party' },
             { id: 2, src: 'assets/indoor-obstacle-play-area Large.jpeg', label: 'Playhouse', description: 'Indoor games, obstacle fun and playful Last Born Association resort energy.', keywords: 'LaBaNi playhouse, indoor obstacle play area, last born games, Abuja party activities' },
             { id: 3, src: 'assets/restaurant-lounge-dining Large.jpeg', label: 'Lounge', description: 'Premium dining, bottle service conversations and rich Naija lounge ambience.', keywords: 'LaBaNi lounge, restaurant lounge, VIP dining, Abuja premium chilling' },
@@ -422,7 +428,7 @@
             { id: 7, src: 'assets/evening-labani-concert-stage Large.jpeg', label: 'Concert', description: 'Live stage, VIP tables and the biggest LaBaNi performance moment.', keywords: 'LaBaNi concert, live stage, VIP tables, biggest party in Abuja' }
         ];
 
-        const SOCIAL_PROOF = [
+        let SOCIAL_PROOF = [
             "🎉 Chief Emeka secured a VIP Slot!",
             "🔥 50+ last borns just joined the Pool Side.",
             "👑 Only 3 VIP Don slots remaining!",
@@ -878,6 +884,223 @@
             localStorage.setItem(key, JSON.stringify(value));
         };
 
+        const normalizeTicket = (row) => ({
+            event: row.event_code,
+            passId: row.pass_id,
+            guestId: row.guest_id,
+            name: row.guest_name,
+            phone: row.phone,
+            isVip: Boolean(row.is_vip),
+            paid: Boolean(row.paid),
+            zones: Array.isArray(row.zones) ? row.zones : [],
+            amountPaid: Number(row.amount_paid || 0),
+            issuedAt: row.issued_at,
+            upgradedAt: row.upgraded_at || null
+        });
+
+        const normalizeScan = (row) => ({
+            id: row.scan_id,
+            passId: row.pass_id,
+            guestName: row.guest_name,
+            zoneId: row.zone_id,
+            zoneName: row.zone_name,
+            status: row.status,
+            repeat: Boolean(row.repeat_entry),
+            moved: Boolean(row.moved),
+            previousZoneId: row.previous_zone_id || null,
+            previousZoneName: row.previous_zone_name || null,
+            reason: row.reason,
+            scannedAt: row.scanned_at
+        });
+
+        const ticketToRow = (ticket) => ({
+            event_code: ticket.event,
+            pass_id: ticket.passId,
+            guest_id: ticket.guestId,
+            guest_name: ticket.name,
+            phone: ticket.phone,
+            is_vip: Boolean(ticket.isVip),
+            paid: Boolean(ticket.paid),
+            zones: ticket.zones || [],
+            amount_paid: Number(ticket.amountPaid || 0),
+            issued_at: ticket.issuedAt,
+            upgraded_at: ticket.upgradedAt || null
+        });
+
+        const scanToRow = (scan) => ({
+            scan_id: scan.id,
+            event_code: EVENT_CODE,
+            pass_id: scan.passId || null,
+            guest_name: scan.guestName || null,
+            zone_id: scan.zoneId,
+            zone_name: scan.zoneName,
+            status: scan.status,
+            repeat_entry: Boolean(scan.repeat),
+            moved: Boolean(scan.moved),
+            previous_zone_id: scan.previousZoneId || null,
+            previous_zone_name: scan.previousZoneName || null,
+            reason: scan.reason,
+            scanned_at: scan.scannedAt
+        });
+
+        const cacheTickets = (ticketsArray) => {
+            const tickets = ticketsArray.reduce((acc, ticket) => {
+                acc[ticket.passId] = ticket;
+                return acc;
+            }, {});
+            writeStore(STORAGE_KEYS.tickets, tickets);
+            return tickets;
+        };
+
+        const loadTicketsFromDatabase = async () => {
+            if (!supabaseClient) return readStore(STORAGE_KEYS.tickets, {});
+            const { data, error } = await supabaseClient
+                .from('tickets')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .order('issued_at', { ascending: true });
+            if (error) throw error;
+            return cacheTickets((data || []).map(normalizeTicket));
+        };
+
+        const loadScansFromDatabase = async () => {
+            if (!supabaseClient) return readStore(STORAGE_KEYS.scans, []);
+            const { data, error } = await supabaseClient
+                .from('ticket_scans')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .order('scanned_at', { ascending: true });
+            if (error) throw error;
+            const scans = (data || []).map(normalizeScan);
+            writeStore(STORAGE_KEYS.scans, scans);
+            return scans;
+        };
+
+        const upsertTicketToDatabase = async (ticket) => {
+            if (!supabaseClient) return;
+            const { error } = await supabaseClient
+                .from('tickets')
+                .upsert(ticketToRow(ticket), { onConflict: 'pass_id' });
+            if (error) throw error;
+        };
+
+        const insertScanToDatabase = async (scan) => {
+            if (!supabaseClient) return;
+            const { error } = await supabaseClient
+                .from('ticket_scans')
+                .insert(scanToRow(scan));
+            if (error) throw error;
+        };
+
+        const fetchTicketByPassId = async (passId) => {
+            if (!supabaseClient) return readStore(STORAGE_KEYS.tickets, {})[passId] || null;
+            const { data, error } = await supabaseClient
+                .from('tickets')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .eq('pass_id', passId)
+                .maybeSingle();
+            if (error) throw error;
+            if (!data) return null;
+            const ticket = normalizeTicket(data);
+            const tickets = readStore(STORAGE_KEYS.tickets, {});
+            tickets[ticket.passId] = ticket;
+            writeStore(STORAGE_KEYS.tickets, tickets);
+            return ticket;
+        };
+
+        const loadContentFromDatabase = async () => {
+            if (!supabaseClient) return;
+
+            const [
+                settingsResult,
+                activitiesResult,
+                heroResult,
+                zoneSliderResult,
+                perksResult,
+                socialResult
+            ] = await Promise.all([
+                supabaseClient.from('event_settings').select('*').eq('event_code', EVENT_CODE).maybeSingle(),
+                supabaseClient.from('resort_activities').select('*').eq('event_code', EVENT_CODE).eq('is_active', true).order('display_order', { ascending: true }),
+                supabaseClient.from('hero_media').select('*').eq('event_code', EVENT_CODE).eq('is_active', true).order('display_order', { ascending: true }),
+                supabaseClient.from('zone_slider_media').select('*').eq('event_code', EVENT_CODE).eq('is_active', true).order('display_order', { ascending: true }),
+                supabaseClient.from('vip_perks').select('*').eq('event_code', EVENT_CODE).eq('is_active', true).order('display_order', { ascending: true }),
+                supabaseClient.from('social_proof').select('*').eq('event_code', EVENT_CODE).eq('is_active', true).order('display_order', { ascending: true })
+            ]);
+
+            const firstError = [settingsResult, activitiesResult, heroResult, zoneSliderResult, perksResult, socialResult].find(result => result.error)?.error;
+            if (firstError) throw firstError;
+
+            if (settingsResult.data) {
+                const settings = settingsResult.data;
+                ORIGINAL_ENTRY_FEE = Number(settings.original_entry_fee || ORIGINAL_ENTRY_FEE);
+                DISCOUNT_START_DATE = new Date(settings.discount_start_date || DISCOUNT_START_DATE);
+                STARTING_DISCOUNT_PERCENT = Number(settings.starting_discount_percent ?? STARTING_DISCOUNT_PERCENT);
+                DAILY_DISCOUNT_DROP = Number(settings.daily_discount_drop ?? DAILY_DISCOUNT_DROP);
+                ADDITIONAL_GUEST_DISCOUNT_PERCENT = Number(settings.additional_guest_discount_percent ?? ADDITIONAL_GUEST_DISCOUNT_PERCENT);
+                ORIGINAL_VIP_FEE = Number(settings.original_vip_fee || ORIGINAL_VIP_FEE);
+                TOTAL_VIP_SLOTS = Number(settings.total_vip_slots || TOTAL_VIP_SLOTS);
+            }
+
+            if (activitiesResult.data?.length) {
+                RESORT_ACTIVITIES = activitiesResult.data.map(row => ({
+                    id: row.activity_id,
+                    name: row.name,
+                    type: row.type,
+                    img: row.img,
+                    price: Number(row.price || 0),
+                    icon: row.icon,
+                    description: row.description,
+                    keywords: row.keywords
+                }));
+            }
+
+            if (heroResult.data?.length) {
+                HERO_MEDIA = heroResult.data.map(row => ({
+                    id: row.display_order,
+                    src: row.src,
+                    hook: row.hook,
+                    alt: row.alt,
+                    keywords: row.keywords
+                }));
+            }
+
+            if (zoneSliderResult.data?.length) {
+                ZONE_SLIDER_MEDIA = zoneSliderResult.data.map(row => ({
+                    id: row.display_order,
+                    src: row.src,
+                    label: row.label,
+                    description: row.description,
+                    keywords: row.keywords
+                }));
+            }
+
+            if (perksResult.data?.length) {
+                VIP_PERKS = perksResult.data.map(row => row.perk);
+            }
+
+            if (socialResult.data?.length) {
+                SOCIAL_PROOF = socialResult.data.map(row => row.message);
+            }
+        };
+
+        const hydrateFromSupabase = async () => {
+            if (!supabaseClient) {
+                console.warn('Supabase client was not loaded. Using local cache only.');
+                return;
+            }
+
+            try {
+                await loadContentFromDatabase();
+                await Promise.all([loadTicketsFromDatabase(), loadScansFromDatabase()]);
+                databaseOnline = true;
+                render();
+            } catch (error) {
+                databaseOnline = false;
+                console.warn('LaBaNi database sync failed. Using local cache fallback:', error);
+            }
+        };
+
         const generatePassId = () => {
             const tickets = readStore(STORAGE_KEYS.tickets, {});
             for (let attempt = 0; attempt < 50; attempt++) {
@@ -894,8 +1117,9 @@
             return [RESORT_GROUNDS.id, ...activityIds];
         };
 
-        const issueTickets = () => {
+        const issueTickets = async () => {
             const tickets = readStore(STORAGE_KEYS.tickets, {});
+            const issuedTickets = [];
             state.guests = state.guests.map(guest => {
                 const passId = guest.passId || generatePassId();
                 const ticket = {
@@ -911,12 +1135,17 @@
                     issuedAt: new Date().toISOString()
                 };
                 tickets[passId] = ticket;
+                issuedTickets.push(ticket);
                 return { ...guest, passId };
             });
             writeStore(STORAGE_KEYS.tickets, tickets);
+            await Promise.all(issuedTickets.map(upsertTicketToDatabase));
         };
 
         const ticketPayload = (guest) => {
+            const storedTicket = guest.passId ? readStore(STORAGE_KEYS.tickets, {})[guest.passId] : null;
+            if (storedTicket) return ticketPayloadFromTicket(storedTicket);
+
             return JSON.stringify({
                 event: EVENT_CODE,
                 passId: guest.passId,
@@ -980,10 +1209,11 @@
                 }, {});
         };
 
-        const verifyTicketForZone = (rawValue, zoneId) => {
+        const verifyTicketForZone = async (rawValue, zoneId) => {
             const payload = parseScanPayload(rawValue);
             const tickets = readStore(STORAGE_KEYS.tickets, {});
-            const ticket = tickets[payload.passId] || (
+            const storedTicket = tickets[payload.passId] || await fetchTicketByPassId(payload.passId);
+            const ticket = storedTicket || (
                 payload.event === EVENT_CODE && payload.passId && Array.isArray(payload.zones)
                     ? {
                         event: EVENT_CODE,
@@ -1014,12 +1244,14 @@
                 };
                 scans.push(denied);
                 writeStore(STORAGE_KEYS.scans, scans);
+                await insertScanToDatabase(denied);
                 return { ok: false, title: 'Bounce Off', message: denied.reason, scan: denied };
             }
 
             if (!tickets[ticket.passId]) {
                 tickets[ticket.passId] = ticket;
                 writeStore(STORAGE_KEYS.tickets, tickets);
+                await upsertTicketToDatabase(ticket);
             }
 
             if (!ticket.paid) {
@@ -1035,6 +1267,7 @@
                 };
                 scans.push(denied);
                 writeStore(STORAGE_KEYS.scans, scans);
+                await insertScanToDatabase(denied);
                 return { ok: false, title: 'Bounce Off', message: denied.reason, ticket, scan: denied };
             }
 
@@ -1051,6 +1284,7 @@
                 };
                 scans.push(denied);
                 writeStore(STORAGE_KEYS.scans, scans);
+                await insertScanToDatabase(denied);
                 return { ok: false, title: 'Bounce Off', message: denied.reason, ticket, scan: denied };
             }
 
@@ -1077,6 +1311,7 @@
             };
             scans.push(permitted);
             writeStore(STORAGE_KEYS.scans, scans);
+            await insertScanToDatabase(permitted);
 
             return {
                 ok: true,
@@ -1252,11 +1487,16 @@
             state.isProcessing = true;
             updateCheckoutTotals();
             
-            setTimeout(() => {
-                issueTickets();
+            setTimeout(async () => {
+                try {
+                    await issueTickets();
+                    state.checkoutComplete = true;
+                } catch (error) {
+                    alert('Ticket could not be saved to the database. Please check your connection and try again.');
+                    console.error('LaBaNi ticket save failed:', error);
+                }
                 state.isProcessing = false;
-                state.checkoutComplete = true;
-                render(); 
+                render();
                 document.getElementById('main-content').scrollTo(0,0);
             }, 2500);
         };
@@ -1266,11 +1506,11 @@
             state.manageLookup.error = '';
         };
 
-        window.loginTicketForUpgrade = () => {
+        window.loginTicketForUpgrade = async () => {
             const phone = String(state.manageLookup.phone || '').trim();
             const passId = normalizePassId(state.manageLookup.passId);
             const tickets = readStore(STORAGE_KEYS.tickets, {});
-            const ticket = tickets[passId];
+            let ticket = tickets[passId];
 
             if (!phone || !passId) {
                 state.manageLookup.error = 'Enter your phone number and ticket number to continue.';
@@ -1280,6 +1520,14 @@
 
             if (!/^LB-\d{5}$/.test(passId)) {
                 state.manageLookup.error = 'Ticket number must be 5 digits in this format: LB-12345.';
+                renderManageView();
+                return;
+            }
+
+            try {
+                ticket = ticket || await fetchTicketByPassId(passId);
+            } catch (error) {
+                state.manageLookup.error = 'Could not reach the ticket database. Please check your connection and try again.';
                 renderManageView();
                 return;
             }
@@ -1336,9 +1584,20 @@
             lookup.processing = true;
             renderManageView();
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 const tickets = readStore(STORAGE_KEYS.tickets, {});
-                const freshTicket = tickets[lookup.ticket.passId];
+                let freshTicket = tickets[lookup.ticket.passId];
+                try {
+                    freshTicket = await fetchTicketByPassId(lookup.ticket.passId) || freshTicket;
+                } catch (error) {
+                    state.manageLookup = {
+                        ...lookup,
+                        processing: false,
+                        error: 'Could not reach the ticket database. Please check your connection and try again.'
+                    };
+                    renderManageView();
+                    return;
+                }
                 if (!freshTicket) {
                     state.manageLookup = {
                         ...lookup,
@@ -1361,6 +1620,17 @@
 
                 tickets[updatedTicket.passId] = updatedTicket;
                 writeStore(STORAGE_KEYS.tickets, tickets);
+                try {
+                    await upsertTicketToDatabase(updatedTicket);
+                } catch (error) {
+                    state.manageLookup = {
+                        ...lookup,
+                        processing: false,
+                        error: 'Zone upgrade could not be saved to the database. Please try again.'
+                    };
+                    renderManageView();
+                    return;
+                }
 
                 state.manageLookup = {
                     phone: updatedTicket.phone,
@@ -1412,11 +1682,11 @@
             input.value = '';
         };
 
-        window.runVerification = (rawValue) => {
+        window.runVerification = async (rawValue) => {
             const zoneId = document.getElementById('admin-zone-select')?.value || RESORT_GROUNDS.id;
             let result;
             try {
-                result = verifyTicketForZone(rawValue, zoneId);
+                result = await verifyTicketForZone(rawValue, zoneId);
             } catch (error) {
                 result = { ok: false, title: 'Invalid QR', message: error.message };
             }
@@ -2680,7 +2950,15 @@
             `;
         }
 
-        function renderAdminView(result = null) {
+        async function renderAdminView(result = null) {
+            if (databaseOnline) {
+                try {
+                    await Promise.all([loadTicketsFromDatabase(), loadScansFromDatabase()]);
+                } catch (error) {
+                    console.warn('Could not refresh admin database data:', error);
+                }
+            }
+
             const container = document.getElementById('main-content');
             const zones = getAllZones();
             const analytics = getZoneAnalytics();
@@ -2830,6 +3108,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             render();
             runLaBaniIntro();
+            hydrateFromSupabase();
         });
 
         window.addEventListener('hashchange', () => {
