@@ -1,35 +1,60 @@
-# LaBaNi Stanbic Gateway
+# LaBaNi Peygo Payment Gateway
 
-The frontend reserves tickets first, then shows a unique Stanbic IBTC virtual account for the booking.
+LaBaNi should not be a direct Stanbic endpoint. Stanbic continues to call Peygo/Wix, and LaBaNi only talks to Peygo.
 
-## Supabase Edge Functions
+## Flow
 
-- Name enquiry: `https://acqypknpiqxtavzjqhpo.supabase.co/functions/v1/stanbic-name-enquiry`
-- Payment notifications: `https://acqypknpiqxtavzjqhpo.supabase.co/functions/v1/stanbic-notifications`
+1. LaBaNi checkout calls Peygo:
+   `POST {PEYGO_DOMAIN}/_functions/apiLabaniCreateBooking`
+2. Peygo creates a LaBaNi booking in Wix, generates the `5770...` virtual account, and syncs pending tickets to Supabase.
+3. Stanbic name enquiry keeps calling Peygo's existing `post_stanbicNameEnquiry`.
+4. Peygo resolves LaBaNi accounts from `LabaniBookings`.
+5. Stanbic payment notifications keep calling Peygo's existing `post_stanbicNotifications`.
+6. Peygo records the deposit in `LabaniDeposits`, updates `LabaniBookings`, and syncs paid ticket status back to Supabase.
+7. The LaBaNi frontend refreshes ticket status from Supabase.
 
-Deploy both functions with JWT verification disabled because Stanbic calls them directly:
+## Frontend Config
 
-```bash
-supabase functions deploy stanbic-name-enquiry --project-ref acqypknpiqxtavzjqhpo --no-verify-jwt
-supabase functions deploy stanbic-notifications --project-ref acqypknpiqxtavzjqhpo --no-verify-jwt
+In [index.html](/Users/mac/Downloads/Labani/index.html), replace this placeholder with the actual Peygo Wix functions domain:
+
+```js
+const PEYGO_FUNCTIONS_BASE_URL = (window.LABANI_PEYGO_FUNCTIONS_BASE_URL || localStorage.getItem('labani_peygo_functions_base_url') || 'https://YOUR-PEYGO-WIX-DOMAIN/_functions').replace(/\/$/, '');
 ```
 
-## Required Function Secrets
+Example shape:
 
-Set these in Supabase before going live:
-
-```bash
-supabase secrets set --project-ref acqypknpiqxtavzjqhpo \
-  STANBIC_PROVIDER_ID='...' \
-  STANBIC_PROVIDER_SECRET='...' \
-  STANBIC_WEBHOOK_KEY='...' \
-  SUPABASE_SERVICE_ROLE_KEY='...'
+```js
+const PEYGO_FUNCTIONS_BASE_URL = 'https://your-peygo-site.com/_functions';
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` must stay server-side only. Do not add it to `index.html`.
+## Peygo/Wix Backend
 
-## Gateway Contract
+Paste [peygo-labani-http-functions-snippet.js](/Users/mac/Downloads/Labani/peygo-labani-http-functions-snippet.js) into Peygo's existing `http-functions.js`.
 
-Stanbic name enquiry should send `provider_id` and `provider_secret` headers, plus JSON containing `requestId` and `accountNumber`.
+Create these Wix Data collections:
 
-Stanbic notifications should send `x-stanbic-signature` as an HMAC-SHA256 signature of the raw request body using `STANBIC_WEBHOOK_KEY`. The function accepts either one transaction object or an array of transaction objects.
+- `LabaniBookings`
+- `LabaniDeposits`
+
+Add the two integration branches at the bottom of the snippet into the existing:
+
+- `post_stanbicNameEnquiry`
+- `post_stanbicNotifications`
+
+## Peygo Secrets
+
+Set these in Wix Secrets Manager:
+
+- `LABANI_SUPABASE_URL`
+- `LABANI_SUPABASE_SERVICE_ROLE_KEY`
+
+If omitted, the snippet falls back to the shared `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` secrets.
+
+## Retire Direct Supabase Stanbic Functions
+
+The previously deployed Supabase functions are no longer the intended flow. Remove them from Supabase when ready:
+
+```bash
+supabase functions delete stanbic-name-enquiry --project-ref acqypknpiqxtavzjqhpo
+supabase functions delete stanbic-notifications --project-ref acqypknpiqxtavzjqhpo
+```
