@@ -192,12 +192,12 @@ insert into public.event_settings (
   total_vip_slots
 ) values (
   'LABANI-KINTIK-2026',
-  100000,
+  400,
   '2026-05-29T00:00:00+01:00',
   50,
   2,
   20,
-  1000000,
+  450,
   10
 ) on conflict (event_code) do update set
   original_entry_fee = excluded.original_entry_fee,
@@ -210,12 +210,12 @@ insert into public.event_settings (
   updated_at = now();
 
 insert into public.resort_activities (event_code, activity_id, display_order, name, type, img, price, icon, description, keywords) values
-('LABANI-KINTIK-2026', 'a1', 1, 'Nightclub', 'Late Night Vibes', 'assets/red-lit-nightclub-vip-lounge Large.jpeg', 25000, 'music', 'Red-lit VIP nightclub lounge for LaBaNi 2026, built for rich Nigerian spenders, celebrity party energy, Afrobeats, highlife and late-night Naija vibes.', 'LaBaNi nightclub, VIP lounge, celebrity party, Naija nightlife, rich Nigerian party, Abuja exclusive party'),
-('LABANI-KINTIK-2026', 'a2', 2, 'Pool Side', 'Wet & Wild', 'assets/pool-party-resort Large.jpeg', 20000, 'droplets', 'Premium resort pool party zone for LaBaNi 2026 with swimwear, cabana energy, Abuja party crowd and Last Born Association wet and wild vibes.', 'LaBaNi pool party, Abuja pool party, Naija resort party, VIP cabana, Last Born Association'),
-('LABANI-KINTIK-2026', 'a3', 3, 'Playhouse', 'Games & Fun', 'assets/indoor-obstacle-play-area Large.jpeg', 10000, 'tent', 'Indoor obstacle playhouse and fun zone for LaBaNi guests, last born games, resort activities and playful premium Nigerian party moments.', 'LaBaNi playhouse, resort games, last born fun, Abuja party activities, Naija event games'),
-('LABANI-KINTIK-2026', 'a5', 4, 'Lounge', 'Premium Chilling', 'assets/restaurant-lounge-dining Large.jpeg', 15000, 'glass-water', 'Premium LaBaNi lounge and dining zone for rich Naija chilling, bottle service, spenders, VIP conversations and Nigerian highlife ambience.', 'LaBaNi lounge, premium chilling, rich Nigerians, spenders, VIP dining, Abuja lounge party'),
-('LABANI-KINTIK-2026', 'a6', 5, 'Karaoke Sit-out / Restaurant', 'Food & Vocals', 'assets/outdoor-patio-restaurant-crowd Large.jpeg', 5000, 'mic', 'Outdoor patio restaurant and karaoke sit-out for LaBaNi guests, food, vocals, grill energy, Naija highlife and social resort dining.', 'LaBaNi karaoke, restaurant sit-out, Naija food, highlife, Kintik grills, Abuja party restaurant'),
-('LABANI-KINTIK-2026', 'a7', 6, 'Concert', 'Live Performances', 'assets/evening-labani-concert-stage Large.jpeg', 20000, 'party-popper', 'LaBaNi 2026 concert stage with VIP tables, celebrity-style performances, Abuja biggest party energy, Nigerian highlife and premium crowd scenes.', 'LaBaNi concert, biggest party in Abuja, celebrity party, Nigerian highlife, VIP tables, Last Born Association')
+('LABANI-KINTIK-2026', 'a1', 1, 'Nightclub', 'Late Night Vibes', 'assets/red-lit-nightclub-vip-lounge Large.jpeg', 120, 'music', 'Red-lit VIP nightclub lounge for LaBaNi 2026, built for rich Nigerian spenders, celebrity party energy, Afrobeats, highlife and late-night Naija vibes.', 'LaBaNi nightclub, VIP lounge, celebrity party, Naija nightlife, rich Nigerian party, Abuja exclusive party'),
+('LABANI-KINTIK-2026', 'a2', 2, 'Pool Side', 'Wet & Wild', 'assets/pool-party-resort Large.jpeg', 100, 'droplets', 'Premium resort pool party zone for LaBaNi 2026 with swimwear, cabana energy, Abuja party crowd and Last Born Association wet and wild vibes.', 'LaBaNi pool party, Abuja pool party, Naija resort party, VIP cabana, Last Born Association'),
+('LABANI-KINTIK-2026', 'a3', 3, 'Playhouse', 'Games & Fun', 'assets/indoor-obstacle-play-area Large.jpeg', 80, 'tent', 'Indoor obstacle playhouse and fun zone for LaBaNi guests, last born games, resort activities and playful premium Nigerian party moments.', 'LaBaNi playhouse, resort games, last born fun, Abuja party activities, Naija event games'),
+('LABANI-KINTIK-2026', 'a5', 4, 'Lounge', 'Premium Chilling', 'assets/restaurant-lounge-dining Large.jpeg', 90, 'glass-water', 'Premium LaBaNi lounge and dining zone for rich Naija chilling, bottle service, spenders, VIP conversations and Nigerian highlife ambience.', 'LaBaNi lounge, premium chilling, rich Nigerians, spenders, VIP dining, Abuja lounge party'),
+('LABANI-KINTIK-2026', 'a6', 5, 'Karaoke Sit-out / Restaurant', 'Food & Vocals', 'assets/outdoor-patio-restaurant-crowd Large.jpeg', 50, 'mic', 'Outdoor patio restaurant and karaoke sit-out for LaBaNi guests, food, vocals, grill energy, Naija highlife and social resort dining.', 'LaBaNi karaoke, restaurant sit-out, Naija food, highlife, Kintik grills, Abuja party restaurant'),
+('LABANI-KINTIK-2026', 'a7', 6, 'Concert', 'Live Performances', 'assets/evening-labani-concert-stage Large.jpeg', 100, 'party-popper', 'LaBaNi 2026 concert stage with VIP tables, celebrity-style performances, Abuja biggest party energy, Nigerian highlife and premium crowd scenes.', 'LaBaNi concert, biggest party in Abuja, celebrity party, Nigerian highlife, VIP tables, Last Born Association')
 on conflict (event_code, activity_id) do update set
   display_order = excluded.display_order,
   name = excluded.name,
@@ -262,5 +262,5 @@ insert into public.social_proof (event_code, display_order, message) values
 ('LABANI-KINTIK-2026', 1, 'Chief Emeka secured a VIP Slot!'),
 ('LABANI-KINTIK-2026', 2, '50+ last borns just joined the Pool Side.'),
 ('LABANI-KINTIK-2026', 3, 'Only 3 VIP Don slots remaining!'),
-('LABANI-KINTIK-2026', 4, 'Amaka just paid ₦150k for her squad.')
+('LABANI-KINTIK-2026', 4, 'Amaka just paid for her squad.')
 on conflict (event_code, display_order) do update set message = excluded.message, is_active = true;

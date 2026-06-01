@@ -77,8 +77,8 @@
         "@type": "AggregateOffer",
         "url": "https://labaniparty.com/tickets",
         "priceCurrency": "NGN",
-        "lowPrice": "50000",
-        "highPrice": "500000",
+        "lowPrice": "50",
+        "highPrice": "450",
         "offerCount": "10",
         "availability": "https://schema.org/InStock",
         "validFrom": "2026-05-29T00:00:00+01:00"
@@ -322,12 +322,12 @@
         const PEYGO_LABANI_CREATE_BOOKING_URL = `${PEYGO_FUNCTIONS_BASE_URL}/apiLabaniCreateBooking`;
         let databaseOnline = false;
 
-        let ORIGINAL_ENTRY_FEE = 100000;
+        let ORIGINAL_ENTRY_FEE = 400;
         let DISCOUNT_START_DATE = new Date('2026-05-29T00:00:00+01:00');
         let STARTING_DISCOUNT_PERCENT = 50;
         let DAILY_DISCOUNT_DROP = 2;
         let ADDITIONAL_GUEST_DISCOUNT_PERCENT = 20;
-        let ORIGINAL_VIP_FEE = 1000000;
+        let ORIGINAL_VIP_FEE = 450;
         let TOTAL_VIP_SLOTS = 10;
         const EVENT_CODE = 'LABANI-KINTIK-2026';
         const STORAGE_KEYS = {
@@ -343,7 +343,7 @@
                 name: 'Nightclub',
                 type: 'Late Night Vibes',
                 img: 'assets/red-lit-nightclub-vip-lounge Large.jpeg',
-                price: 25000,
+                price: 120,
                 icon: 'music',
                 description: 'Red-lit VIP nightclub lounge for LaBaNi 2026, built for rich Nigerian spenders, celebrity party energy, Afrobeats, highlife and late-night Naija vibes.',
                 keywords: 'LaBaNi nightclub, VIP lounge, celebrity party, Naija nightlife, rich Nigerian party, Abuja exclusive party'
@@ -353,7 +353,7 @@
                 name: 'Pool Side',
                 type: 'Wet & Wild',
                 img: 'assets/pool-party-resort Large.jpeg',
-                price: 20000,
+                price: 100,
                 icon: 'droplets',
                 description: 'Premium resort pool party zone for LaBaNi 2026 with swimwear, cabana energy, Abuja party crowd and Last Born Association wet and wild vibes.',
                 keywords: 'LaBaNi pool party, Abuja pool party, Naija resort party, VIP cabana, Last Born Association'
@@ -363,7 +363,7 @@
                 name: 'Playhouse',
                 type: 'Games & Fun',
                 img: 'assets/indoor-obstacle-play-area Large.jpeg',
-                price: 10000,
+                price: 80,
                 icon: 'tent',
                 description: 'Indoor obstacle playhouse and fun zone for LaBaNi guests, last born games, resort activities and playful premium Nigerian party moments.',
                 keywords: 'LaBaNi playhouse, resort games, last born fun, Abuja party activities, Naija event games'
@@ -373,7 +373,7 @@
                 name: 'Lounge',
                 type: 'Premium Chilling',
                 img: 'assets/restaurant-lounge-dining Large.jpeg',
-                price: 15000,
+                price: 90,
                 icon: 'glass-water',
                 description: 'Premium LaBaNi lounge and dining zone for rich Naija chilling, bottle service, spenders, VIP conversations and Nigerian highlife ambience.',
                 keywords: 'LaBaNi lounge, premium chilling, rich Nigerians, spenders, VIP dining, Abuja lounge party'
@@ -383,7 +383,7 @@
                 name: 'Karaoke Sit-out / Restaurant',
                 type: 'Food & Vocals',
                 img: 'assets/outdoor-patio-restaurant-crowd Large.jpeg',
-                price: 5000,
+                price: 50,
                 icon: 'mic',
                 description: 'Outdoor patio restaurant and karaoke sit-out for LaBaNi guests, food, vocals, grill energy, Naija highlife and social resort dining.',
                 keywords: 'LaBaNi karaoke, restaurant sit-out, Naija food, highlife, Kintik grills, Abuja party restaurant'
@@ -393,7 +393,7 @@
                 name: 'Concert',
                 type: 'Live Performances',
                 img: 'assets/evening-labani-concert-stage Large.jpeg',
-                price: 20000,
+                price: 100,
                 icon: 'party-popper',
                 description: 'LaBaNi 2026 concert stage with VIP tables, celebrity-style performances, Abuja biggest party energy, Nigerian highlife and premium crowd scenes.',
                 keywords: 'LaBaNi concert, biggest party in Abuja, celebrity party, Nigerian highlife, VIP tables, Last Born Association'
@@ -435,7 +435,7 @@
             "🎉 Chief Emeka secured a VIP Slot!",
             "🔥 50+ last borns just joined the Pool Side.",
             "👑 Only 3 VIP Don slots remaining!",
-            "💸 Amaka just paid ₦150k for her squad.",
+            "💸 Amaka just paid for her squad.",
         ];
 
         const INTRO_REWARD_DURATION_MS = 120000;
@@ -493,7 +493,7 @@
                         <div class="bg-white/10 border border-white/10 rounded-2xl p-4">
                             <p class="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Naija Last Born Discount Unlocked</p>
                             <p class="text-3xl font-black text-white">${percent}% OFF</p>
-                            <p class="text-sm font-bold text-slate-300">₦100,000 ticket now reduced for this session.</p>
+                            <p class="text-sm font-bold text-slate-300">Entry ticket now reduced for this test session.</p>
                             ${countdownHTML}
                         </div>
                     </div>
