@@ -181,6 +181,21 @@ create policy "public write tickets" on public.tickets for all using (true) with
 create policy "public read scans" on public.ticket_scans for select using (true);
 create policy "public write scans" on public.ticket_scans for insert with check (true);
 
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'tickets'
+    )
+  then
+    execute 'alter publication supabase_realtime add table public.tickets';
+  end if;
+end $$;
+
 insert into public.event_settings (
   event_code,
   original_entry_fee,
