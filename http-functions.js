@@ -600,8 +600,6 @@ async function resolveDuesilyNameEnquiry(accountNumber) {
 /* ------------------------ LaBaNi / Peygo helpers ------------------------ */
 
 const LABANI_EVENT_CODE = 'LABANI-KINTIK-2026';
-const LABANI_BOOKINGS_COLLECTION = 'LabaniBookings';
-const LABANI_DEPOSITS_COLLECTION = 'LabaniDeposits';
 
 async function getLabaniSupabaseConfig() {
   const [labaniUrl, sharedUrl, labaniServiceRoleKey, sharedServiceRoleKey] = await Promise.all([
@@ -644,7 +642,21 @@ async function labaniSupabaseRequest(path, options = {}) {
 }
 
 async function fetchLabaniBookingByWalletAccount(walletAccountNumber) {
-  return findOneByFieldStrOrNum(LABANI_BOOKINGS_COLLECTION, 'walletAccountNumber', walletAccountNumber);
+  const acct = toStr(walletAccountNumber);
+  if (!acct) return null;
+  const rows = await labaniSupabaseRequest(
+    `/rest/v1/labani_bookings?event_code=eq.${encodeURIComponent(LABANI_EVENT_CODE)}&wallet_account_number=eq.${encodeURIComponent(acct)}&select=*&limit=1`
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+async function fetchLabaniBookingById(bookingId) {
+  const id = toStr(bookingId);
+  if (!id) return null;
+  const rows = await labaniSupabaseRequest(
+    `/rest/v1/labani_bookings?event_code=eq.${encodeURIComponent(LABANI_EVENT_CODE)}&booking_id=eq.${encodeURIComponent(id)}&select=*&limit=1`
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
 async function isLabaniVirtualAccountTaken(walletAccountNumber) {
@@ -715,16 +727,17 @@ async function upsertLabaniTicketsToSupabase(tickets, booking) {
 }
 
 async function buildLabaniBookingStatus(booking) {
+  const rawPaymentPayload = booking.rawPaymentPayload ?? booking.raw_payment_payload;
   return {
-    bookingId: toStr(booking.bookingId),
-    walletAccountNumber: toStr(booking.walletAccountNumber),
-    accountName: toStr(booking.accountName) || 'LaBaNi Party',
-    amountExpected: Math.max(0, toNum(booking.amountExpected, 0)),
-    totalPaid: Math.max(0, toNum(booking.totalPaid, 0)),
-    paymentStatus: toStr(booking.paymentStatus) || 'pending',
-    paidAt: booking.paidAt || null,
-    lastSessionId: toStr(booking.lastSessionId),
-    rawPaymentPayload: parseLabaniJson(booking.rawPaymentPayload, null)
+    bookingId: toStr(booking.bookingId ?? booking.booking_id),
+    walletAccountNumber: toStr(booking.walletAccountNumber ?? booking.wallet_account_number),
+    accountName: toStr(booking.accountName ?? booking.account_name) || 'LaBaNi Party',
+    amountExpected: Math.max(0, toNum(booking.amountExpected ?? booking.amount_expected, 0)),
+    totalPaid: Math.max(0, toNum(booking.totalPaid ?? booking.total_paid, 0)),
+    paymentStatus: toStr(booking.paymentStatus ?? booking.payment_status) || 'pending',
+    paidAt: booking.paidAt || booking.paid_at || null,
+    lastSessionId: toStr(booking.lastSessionId ?? booking.last_session_id),
+    rawPaymentPayload: typeof rawPaymentPayload === 'string' ? parseLabaniJson(rawPaymentPayload, null) : (rawPaymentPayload || null)
   };
 }
 
@@ -735,8 +748,8 @@ async function resolveLabaniNameEnquiry(accountNumber) {
   return {
     found: true,
     systemType: 'LaBaNi',
-    matchedName: toStr(booking.accountName) || 'LaBaNi Party',
-    matchedAccountNum: toStr(booking.walletAccountNumber)
+    matchedName: toStr(booking.account_name) || 'LaBaNi Party',
+    matchedAccountNum: toStr(booking.wallet_account_number)
   };
 }
 
@@ -751,47 +764,70 @@ async function recordLabaniDeposit(tx) {
   const booking = await fetchLabaniBookingByWalletAccount(walletAccountNumber);
   if (!booking) return { handled: false, reason: 'ACCOUNT_NOT_FOUND' };
 
-  const duplicate = await findOneByFieldStrOrNum(LABANI_DEPOSITS_COLLECTION, 'transactionId', txId);
-  if (duplicate) return { handled: true, duplicate: true };
+  const duplicate = await labaniSupabaseRequest(
+    `/rest/v1/labani_deposits?transaction_id=eq.${encodeURIComponent(txId)}&select=transaction_id&limit=1`
+  );
+  if (Array.isArray(duplicate) && duplicate.length) return { handled: true, duplicate: true };
 
-  await wixData.insert(LABANI_DEPOSITS_COLLECTION, {
-    transactionId: txId,
-    bookingId: toStr(booking.bookingId),
-    walletAccountNumber,
-    amount,
-    senderName: toStr(tx.srcAcctName),
-    sourceBank: toStr(tx.srcBank),
-    sessionId: toStr(tx.sessionId),
-    timestamp: new Date(tx.timestamp || Date.now()),
-    rawPayload: JSON.stringify(tx)
-  }, { suppressAuth: true });
+  const bookingId = toStr(booking.booking_id);
+  await labaniSupabaseRequest('/rest/v1/labani_deposits', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      transaction_id: txId,
+      booking_id: bookingId,
+      event_code: LABANI_EVENT_CODE,
+      wallet_account_number: walletAccountNumber,
+      amount,
+      sender_name: toStr(tx.srcAcctName),
+      source_bank: toStr(tx.srcBank),
+      session_id: toStr(tx.sessionId),
+      deposited_at: new Date(tx.timestamp || Date.now()).toISOString(),
+      raw_payload: tx
+    })
+  });
 
-  const deposits = await wixData.query(LABANI_DEPOSITS_COLLECTION)
-    .eq('bookingId', toStr(booking.bookingId))
-    .limit(1000)
-    .find({ suppressAuth: true });
-  const totalPaid = (deposits.items || []).reduce((sum, item) => sum + Math.max(0, toNum(item.amount, 0)), 0);
-  const amountExpected = Math.max(0, toNum(booking.amountExpected, 0));
+  const deposits = await labaniSupabaseRequest(
+    `/rest/v1/labani_deposits?booking_id=eq.${encodeURIComponent(bookingId)}&select=amount`
+  );
+  const totalPaid = (deposits || []).reduce((sum, item) => sum + Math.max(0, toNum(item.amount, 0)), 0);
+  const amountExpected = Math.max(0, toNum(booking.amount_expected, 0));
   const paymentStatus = totalPaid >= amountExpected
     ? (totalPaid > amountExpected ? 'overpaid' : 'paid')
     : 'partial';
-  const paidAt = totalPaid >= amountExpected ? new Date(tx.timestamp || Date.now()) : null;
+  const paidAt = totalPaid >= amountExpected ? new Date(tx.timestamp || Date.now()).toISOString() : null;
 
-  booking.totalPaid = totalPaid;
-  booking.paymentStatus = paymentStatus;
-  booking.paidAt = paidAt;
-  booking.lastTransactionId = txId;
-  booking.lastSessionId = toStr(tx.sessionId);
-  booking.rawPaymentPayload = JSON.stringify(tx);
-  booking.updatedAt = new Date();
-  await wixData.update(LABANI_BOOKINGS_COLLECTION, booking, { suppressAuth: true });
+  const updatedRows = await labaniSupabaseRequest(
+    `/rest/v1/labani_bookings?booking_id=eq.${encodeURIComponent(bookingId)}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        total_paid: totalPaid,
+        payment_status: paymentStatus,
+        paid_at: paidAt,
+        last_transaction_id: txId,
+        last_session_id: toStr(tx.sessionId),
+        raw_payment_payload: tx,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
 
-  const tickets = parseLabaniJson(booking.ticketsJson, []);
-  await upsertLabaniTicketsToSupabase(tickets, await buildLabaniBookingStatus(booking));
+  const updatedBooking = Array.isArray(updatedRows) && updatedRows.length ? updatedRows[0] : {
+    ...booking,
+    total_paid: totalPaid,
+    payment_status: paymentStatus,
+    paid_at: paidAt,
+    last_session_id: toStr(tx.sessionId),
+    raw_payment_payload: tx
+  };
+  const tickets = Array.isArray(updatedBooking.tickets) ? updatedBooking.tickets : [];
+  await upsertLabaniTicketsToSupabase(tickets, await buildLabaniBookingStatus(updatedBooking));
 
   return {
     handled: true,
-    bookingId: toStr(booking.bookingId),
+    bookingId,
     walletAccountNumber,
     amount,
     totalPaid,
@@ -2167,7 +2203,7 @@ export async function post_apiLabaniCreateBooking(request) {
       return apiCors({ success: false, message: 'bookingId, tickets, primaryGuestPhone and amountExpected are required' }, 400);
     }
 
-    const existing = await findOneByFieldStrOrNum(LABANI_BOOKINGS_COLLECTION, 'bookingId', bookingId);
+    const existing = await fetchLabaniBookingById(bookingId);
     if (existing) {
       const status = await buildLabaniBookingStatus(existing);
       await upsertLabaniTicketsToSupabase(tickets, status);
@@ -2177,21 +2213,26 @@ export async function post_apiLabaniCreateBooking(request) {
     const walletAccountNumber = await generateUniqueLabaniVirtualAccount();
     const accountName = sanitizePublicText(payload?.accountName, 80) || `LaBaNi - ${primaryGuestName || 'Guest'}`;
 
-    const booking = await wixData.insert(LABANI_BOOKINGS_COLLECTION, {
-      bookingId,
-      eventCode: LABANI_EVENT_CODE,
-      walletAccountNumber,
-      accountName,
-      amountExpected,
-      totalPaid: 0,
-      paymentStatus: 'pending',
-      primaryGuestName,
-      primaryGuestPhone,
-      ticketsJson: JSON.stringify(tickets),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }, { suppressAuth: true });
+    const createdRows = await labaniSupabaseRequest('/rest/v1/labani_bookings', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        booking_id: bookingId,
+        event_code: LABANI_EVENT_CODE,
+        wallet_account_number: walletAccountNumber,
+        account_name: accountName,
+        amount_expected: amountExpected,
+        total_paid: 0,
+        payment_status: 'pending',
+        primary_guest_name: primaryGuestName,
+        primary_guest_phone: primaryGuestPhone,
+        tickets,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+    });
 
+    const booking = Array.isArray(createdRows) && createdRows.length ? createdRows[0] : await fetchLabaniBookingById(bookingId);
     const status = await buildLabaniBookingStatus(booking);
     await upsertLabaniTicketsToSupabase(tickets, status);
     return apiCors({ success: true, existing: false, booking: status });
@@ -2206,7 +2247,7 @@ export async function get_apiLabaniPaymentStatus(request) {
     const bookingId = toStr(request.query.bookingId);
     const walletAccountNumber = toStr(request.query.walletAccountNumber);
     const booking = bookingId
-      ? await findOneByFieldStrOrNum(LABANI_BOOKINGS_COLLECTION, 'bookingId', bookingId)
+      ? await fetchLabaniBookingById(bookingId)
       : await fetchLabaniBookingByWalletAccount(walletAccountNumber);
 
     if (!booking) return apiCors({ success: false, message: 'LaBaNi booking not found' }, 404);

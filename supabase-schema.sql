@@ -98,6 +98,38 @@ alter table public.tickets add column if not exists payment_session_id text;
 alter table public.tickets add column if not exists raw_payment_payload jsonb;
 alter table public.tickets alter column paid set default false;
 
+create table if not exists public.labani_bookings (
+  booking_id text primary key,
+  event_code text not null references public.event_settings(event_code) on delete cascade,
+  wallet_account_number text not null unique,
+  account_name text not null,
+  amount_expected integer not null default 0,
+  total_paid integer not null default 0,
+  payment_status text not null default 'pending',
+  primary_guest_name text,
+  primary_guest_phone text,
+  tickets jsonb not null default '[]'::jsonb,
+  paid_at timestamptz,
+  last_transaction_id text,
+  last_session_id text,
+  raw_payment_payload jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.labani_deposits (
+  transaction_id text primary key,
+  booking_id text not null references public.labani_bookings(booking_id) on delete cascade,
+  event_code text not null references public.event_settings(event_code) on delete cascade,
+  wallet_account_number text not null,
+  amount integer not null default 0,
+  sender_name text,
+  source_bank text,
+  session_id text,
+  deposited_at timestamptz not null default now(),
+  raw_payload jsonb not null default '{}'::jsonb
+);
+
 create table if not exists public.ticket_scans (
   event_code text not null references public.event_settings(event_code) on delete cascade,
   scan_id text primary key,
@@ -121,6 +153,8 @@ alter table public.zone_slider_media enable row level security;
 alter table public.vip_perks enable row level security;
 alter table public.social_proof enable row level security;
 alter table public.tickets enable row level security;
+alter table public.labani_bookings enable row level security;
+alter table public.labani_deposits enable row level security;
 alter table public.ticket_scans enable row level security;
 
 drop policy if exists "public read event settings" on public.event_settings;
@@ -131,6 +165,8 @@ drop policy if exists "public read vip perks" on public.vip_perks;
 drop policy if exists "public read social proof" on public.social_proof;
 drop policy if exists "public read tickets" on public.tickets;
 drop policy if exists "public write tickets" on public.tickets;
+drop policy if exists "public read labani bookings" on public.labani_bookings;
+drop policy if exists "public read labani deposits" on public.labani_deposits;
 drop policy if exists "public read scans" on public.ticket_scans;
 drop policy if exists "public write scans" on public.ticket_scans;
 
