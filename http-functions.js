@@ -600,18 +600,17 @@ async function resolveDuesilyNameEnquiry(accountNumber) {
 /* ------------------------ LaBaNi / Peygo helpers ------------------------ */
 
 const LABANI_EVENT_CODE = 'LABANI-KINTIK-2026';
+const LABANI_SUPABASE_URL = 'https://acqypknpiqxtavzjqhpo.supabase.co';
 
 async function getLabaniSupabaseConfig() {
-  const [labaniUrl, sharedUrl, labaniServiceRoleKey, sharedServiceRoleKey] = await Promise.all([
-    getSecret('LABANI_SUPABASE_URL').catch(() => ''),
-    getSecret('SUPABASE_URL').catch(() => ''),
-    getSecret('LABANI_SUPABASE_SERVICE_ROLE_KEY').catch(() => ''),
-    getSecret('SUPABASE_SERVICE_ROLE_KEY').catch(() => '')
+  const [labaniUrl, labaniServiceRoleKey] = await Promise.all([
+    getSecret('LABANI_SUPABASE_URL').catch(() => LABANI_SUPABASE_URL),
+    getSecret('LABANI_SUPABASE_SERVICE_ROLE_KEY').catch(() => '')
   ]);
 
   return {
-    url: toStr(labaniUrl || sharedUrl).replace(/\/$/, ''),
-    serviceRoleKey: toStr(labaniServiceRoleKey || sharedServiceRoleKey)
+    url: toStr(labaniUrl || LABANI_SUPABASE_URL).replace(/\/$/, ''),
+    serviceRoleKey: toStr(labaniServiceRoleKey)
   };
 }
 

@@ -43,10 +43,15 @@ The file already includes the LaBaNi branches inside `post_stanbicNameEnquiry` a
 
 Set these in Wix Secrets Manager:
 
-- `LABANI_SUPABASE_URL`
 - `LABANI_SUPABASE_SERVICE_ROLE_KEY`
 
-If omitted, the snippet falls back to the shared `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` secrets.
+`LABANI_SUPABASE_URL` is optional because `http-functions.js` defaults to:
+
+```text
+https://acqypknpiqxtavzjqhpo.supabase.co
+```
+
+Do not rely on Peygo's shared `SUPABASE_URL` for LaBaNi. If it points to another project, Peygo will query the wrong database.
 
 ## Supabase Tables
 
