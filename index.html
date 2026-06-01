@@ -573,6 +573,8 @@
         let sessionIntroReward = null;
         let lastEntryDealSignature = '';
         let scannerStream = null;
+        let paymentRealtimeChannel = null;
+        let paymentRealtimeBookingId = '';
         let scannerFrame = null;
         let deferredInstallPrompt = null;
         let installPromptTimer = null;
@@ -1104,6 +1106,98 @@
             return true;
         };
 
+        const isPaidPaymentStatus = (status) => {
+            const normalized = String(status || '').toLowerCase();
+            return normalized === 'paid' || normalized === 'overpaid';
+        };
+
+        const applyRealtimeTicketUpdate = (row, { renderAfter = true } = {}) => {
+            if (!row || row.event_code !== EVENT_CODE) return false;
+            const activeBooking = readStore(STORAGE_KEYS.activeBooking, null);
+            const activePassIds = Array.isArray(activeBooking?.passIds) ? activeBooking.passIds : [];
+            const belongsToActiveBooking = activeBooking?.bookingId && row.booking_id === activeBooking.bookingId;
+            const belongsToActivePass = activePassIds.includes(row.pass_id);
+            if (!belongsToActiveBooking && !belongsToActivePass) return false;
+
+            const ticket = normalizeTicket(row);
+            cacheTickets([ticket]);
+            state.guests = state.guests.map((guest) => {
+                const matchesGuest = guest.passId === ticket.passId || guest.id === ticket.guestId;
+                return matchesGuest ? { ...guest, ...ticketToGuestState(ticket) } : guest;
+            });
+            restoreActiveBooking();
+
+            if (renderAfter) render();
+            return true;
+        };
+
+        const syncActiveBookingPayment = async ({ renderAfter = false } = {}) => {
+            const activeBooking = readStore(STORAGE_KEYS.activeBooking, null);
+            if (!supabaseClient || !activeBooking?.bookingId) return false;
+
+            const { data, error } = await supabaseClient
+                .from('tickets')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .eq('booking_id', activeBooking.bookingId);
+            if (error) throw error;
+
+            let changed = false;
+            (data || []).forEach((row) => {
+                changed = applyRealtimeTicketUpdate(row, { renderAfter: false }) || changed;
+            });
+
+            if (changed && renderAfter) render();
+            return changed;
+        };
+
+        const stopPaymentRealtime = async () => {
+            if (!paymentRealtimeChannel || !supabaseClient) {
+                paymentRealtimeChannel = null;
+                paymentRealtimeBookingId = '';
+                return;
+            }
+
+            const channel = paymentRealtimeChannel;
+            paymentRealtimeChannel = null;
+            paymentRealtimeBookingId = '';
+            await supabaseClient.removeChannel(channel);
+        };
+
+        const subscribeToActivePayment = () => {
+            const activeBooking = readStore(STORAGE_KEYS.activeBooking, null);
+            const bookingId = activeBooking?.bookingId || '';
+            if (!supabaseClient || !bookingId) {
+                if (paymentRealtimeChannel) stopPaymentRealtime();
+                return;
+            }
+            if (paymentRealtimeChannel && paymentRealtimeBookingId === bookingId) return;
+            if (paymentRealtimeChannel) stopPaymentRealtime();
+
+            paymentRealtimeBookingId = bookingId;
+            paymentRealtimeChannel = supabaseClient
+                .channel(`labani-payment-${bookingId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'tickets',
+                        filter: `booking_id=eq.${bookingId}`
+                    },
+                    (payload) => {
+                        if (payload.new) applyRealtimeTicketUpdate(payload.new);
+                    }
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        syncActiveBookingPayment({ renderAfter: true }).catch((error) => {
+                            console.warn('LaBaNi realtime payment sync failed:', error);
+                        });
+                    }
+                });
+        };
+
         const loadContentFromDatabase = async () => {
             if (!supabaseClient) return;
 
@@ -1189,6 +1283,7 @@
                 await loadContentFromDatabase();
                 await Promise.all([loadTicketsFromDatabase(), loadScansFromDatabase()]);
                 restoreActiveBooking();
+                subscribeToActivePayment();
                 databaseOnline = true;
                 render();
             } catch (error) {
@@ -1459,7 +1554,11 @@
         };
 
         const normalizePassId = (value) => {
-            const normalized = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+            const normalized = String(value || '')
+                .trim()
+                .toUpperCase()
+                .replace(/[‐‑‒–—―−]/g, '-')
+                .replace(/\s+/g, '');
             if (/^\d{5}$/.test(normalized)) return `LB-${normalized}`;
             if (/^LB\d{5}$/.test(normalized)) return `LB-${normalized.slice(2)}`;
             return normalized;
@@ -1748,6 +1847,7 @@
 
         window.startNewBooking = () => {
             removeStore(STORAGE_KEYS.activeBooking);
+            stopPaymentRealtime();
             state.checkoutComplete = false;
             state.acceptedLegal = false;
             state.guests = [{ id: 'g' + Date.now(), name: '', phone: '', isVip: false, selectedActivities: [] }];
@@ -1764,6 +1864,7 @@
                     return ticket ? { ...guest, ...ticketToGuestState(ticket) } : guest;
                 });
                 restoreActiveBooking();
+                subscribeToActivePayment();
                 render();
             } catch (error) {
                 alert('Could not refresh payment status. Please try again.');
@@ -1935,13 +2036,15 @@
             }
 
             if (state.checkoutComplete) {
+                subscribeToActivePayment();
+                const paymentConfirmed = state.guests.some(guest => guest.paid || isPaidPaymentStatus(guest.paymentStatus));
                 nav.style.display = 'none';
                 header.innerHTML = `
-                    <div class="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
-                        <i data-lucide="landmark" class="w-8 h-8"></i>
+                    <div class="w-16 h-16 ${paymentConfirmed ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'} rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
+                        <i data-lucide="${paymentConfirmed ? 'badge-check' : 'landmark'}" class="w-8 h-8"></i>
                     </div>
-                    <h1 class="text-2xl font-black italic text-slate-900 text-center animate-fade-in-up">Payment Account Ready</h1>
-                    <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">Transfer to activate your passes.</p>
+                    <h1 class="text-2xl font-black italic text-slate-900 text-center animate-fade-in-up">${paymentConfirmed ? 'Payment Confirmed' : 'Payment Account Ready'}</h1>
+                    <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">${paymentConfirmed ? 'Your passes are active.' : 'Transfer to activate your passes.'}</p>
                 `;
                 contextBanner.style.display = 'none';
                 mainContent.innerHTML = getReceiptsHTML();
@@ -3268,6 +3371,12 @@
         window.addEventListener('hashchange', () => {
             stopScannerInternal(false);
             render();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (paymentRealtimeChannel && supabaseClient) {
+                supabaseClient.removeChannel(paymentRealtimeChannel);
+            }
         });
 
         window.addEventListener('beforeinstallprompt', (event) => {
