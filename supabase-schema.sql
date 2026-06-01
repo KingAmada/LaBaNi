@@ -178,8 +178,20 @@ create policy "public read vip perks" on public.vip_perks for select using (is_a
 create policy "public read social proof" on public.social_proof for select using (is_active);
 create policy "public read tickets" on public.tickets for select using (true);
 create policy "public write tickets" on public.tickets for all using (true) with check (true);
+create policy "public read labani bookings" on public.labani_bookings for select using (true);
 create policy "public read scans" on public.ticket_scans for select using (true);
 create policy "public write scans" on public.ticket_scans for insert with check (true);
+
+grant usage on schema public to anon, authenticated;
+grant select on public.event_settings to anon, authenticated;
+grant select on public.resort_activities to anon, authenticated;
+grant select on public.hero_media to anon, authenticated;
+grant select on public.zone_slider_media to anon, authenticated;
+grant select on public.vip_perks to anon, authenticated;
+grant select on public.social_proof to anon, authenticated;
+grant select, insert, update on public.tickets to anon, authenticated;
+grant select on public.labani_bookings to anon, authenticated;
+grant select, insert on public.ticket_scans to anon, authenticated;
 
 do $$
 begin
