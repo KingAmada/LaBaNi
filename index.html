@@ -1278,23 +1278,7 @@
         const verifyTicketForZone = async (rawValue, zoneId) => {
             const payload = parseScanPayload(rawValue);
             const tickets = readStore(STORAGE_KEYS.tickets, {});
-            const storedTicket = tickets[payload.passId] || await fetchTicketByPassId(payload.passId);
-            const ticket = storedTicket || (
-                payload.event === EVENT_CODE && payload.passId && Array.isArray(payload.zones)
-                    ? {
-                        event: EVENT_CODE,
-                        passId: payload.passId,
-                        guestId: payload.guestId,
-                        name: payload.name || 'LaBaNi Guest',
-                        phone: payload.phone || '',
-                        isVip: Boolean(payload.isVip),
-                        paid: payload.paid === true,
-                        zones: payload.zones,
-                        amountPaid: Number(payload.amountPaid || 0),
-                        issuedAt: payload.issuedAt || new Date().toISOString()
-                    }
-                    : null
-            );
+            const ticket = tickets[payload.passId] || await fetchTicketByPassId(payload.passId);
             const zone = getAllZones().find(z => z.id === zoneId) || RESORT_GROUNDS;
             const scans = readStore(STORAGE_KEYS.scans, []);
 
@@ -1312,12 +1296,6 @@
                 writeStore(STORAGE_KEYS.scans, scans);
                 await insertScanToDatabase(denied);
                 return { ok: false, title: 'Bounce Off', message: denied.reason, scan: denied };
-            }
-
-            if (!tickets[ticket.passId]) {
-                tickets[ticket.passId] = ticket;
-                writeStore(STORAGE_KEYS.tickets, tickets);
-                await upsertTicketToDatabase(ticket);
             }
 
             if (!ticket.paid) {
