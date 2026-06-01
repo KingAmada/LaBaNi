@@ -894,6 +894,13 @@
             paid: Boolean(row.paid),
             zones: Array.isArray(row.zones) ? row.zones : [],
             amountPaid: Number(row.amount_paid || 0),
+            amountExpected: Number(row.amount_expected || row.amount_paid || 0),
+            paymentAccountNumber: row.payment_account_number || '',
+            paymentAccountName: row.payment_account_name || '',
+            paymentStatus: row.payment_status || (row.paid ? 'paid' : 'pending'),
+            bookingId: row.booking_id || '',
+            paidAt: row.paid_at || null,
+            paymentSessionId: row.payment_session_id || '',
             issuedAt: row.issued_at,
             upgradedAt: row.upgraded_at || null
         });
@@ -923,6 +930,14 @@
             paid: Boolean(ticket.paid),
             zones: ticket.zones || [],
             amount_paid: Number(ticket.amountPaid || 0),
+            amount_expected: Number(ticket.amountExpected || ticket.amountPaid || 0),
+            payment_account_number: ticket.paymentAccountNumber || null,
+            payment_account_name: ticket.paymentAccountName || null,
+            payment_status: ticket.paymentStatus || (ticket.paid ? 'paid' : 'pending'),
+            booking_id: ticket.bookingId || null,
+            paid_at: ticket.paidAt || null,
+            payment_session_id: ticket.paymentSessionId || null,
+            raw_payment_payload: ticket.rawPaymentPayload || null,
             issued_at: ticket.issuedAt,
             upgraded_at: ticket.upgradedAt || null
         });
@@ -1007,6 +1022,32 @@
             tickets[ticket.passId] = ticket;
             writeStore(STORAGE_KEYS.tickets, tickets);
             return ticket;
+        };
+
+        const fetchTicketsByPaymentAccount = async (accountNumber) => {
+            const account = String(accountNumber || '').trim();
+            if (!account || !supabaseClient) return [];
+            const { data, error } = await supabaseClient
+                .from('tickets')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .eq('payment_account_number', account);
+            if (error) throw error;
+            return (data || []).map(normalizeTicket);
+        };
+
+        const generatePaymentAccountNumber = async () => {
+            const localTickets = Object.values(readStore(STORAGE_KEYS.tickets, {}));
+            for (let attempt = 0; attempt < 50; attempt++) {
+                const randomValue = new Uint32Array(1);
+                crypto.getRandomValues(randomValue);
+                const accountNumber = '5770' + String(100000 + (randomValue[0] % 900000));
+                const localTaken = localTickets.some(ticket => ticket.paymentAccountNumber === accountNumber);
+                if (localTaken) continue;
+                const remoteMatches = await fetchTicketsByPaymentAccount(accountNumber).catch(() => []);
+                if (!remoteMatches.length) return accountNumber;
+            }
+            return '5770' + String(Date.now()).slice(-6);
         };
 
         const loadContentFromDatabase = async () => {
@@ -1120,6 +1161,11 @@
         const issueTickets = async () => {
             const tickets = readStore(STORAGE_KEYS.tickets, {});
             const issuedTickets = [];
+            const bookingId = 'booking-' + Date.now();
+            const paymentAccountNumber = await generatePaymentAccountNumber();
+            const primaryGuest = state.guests.find(guest => guest.name.trim()) || state.guests[0];
+            const paymentAccountName = `LaBaNi - ${primaryGuest.name.trim() || 'Guest'}`.slice(0, 80);
+            const bookingTotal = calculateGrandTotal();
             state.guests = state.guests.map(guest => {
                 const passId = guest.passId || generatePassId();
                 const ticket = {
@@ -1129,9 +1175,14 @@
                     name: guest.name.trim(),
                     phone: guest.phone.trim(),
                     isVip: guest.isVip,
-                    paid: true,
+                    paid: false,
                     zones: getGuestZones(guest),
-                    amountPaid: calculateGuestTotal(guest),
+                    amountPaid: 0,
+                    amountExpected: bookingTotal,
+                    paymentAccountNumber,
+                    paymentAccountName,
+                    paymentStatus: 'pending',
+                    bookingId,
                     issuedAt: new Date().toISOString()
                 };
                 tickets[passId] = ticket;
@@ -1153,9 +1204,11 @@
                 name: guest.name.trim(),
                 phone: guest.phone.trim(),
                 isVip: guest.isVip,
-                paid: true,
+                paid: false,
                 zones: getGuestZones(guest),
-                amountPaid: calculateGuestTotal(guest),
+                amountPaid: 0,
+                amountExpected: calculateGrandTotal(),
+                paymentStatus: 'pending',
                 issuedAt: new Date().toISOString()
             });
         };
@@ -1171,6 +1224,12 @@
                 paid: ticket.paid,
                 zones: ticket.zones,
                 amountPaid: ticket.amountPaid,
+                amountExpected: ticket.amountExpected || ticket.amountPaid,
+                paymentAccountNumber: ticket.paymentAccountNumber || '',
+                paymentAccountName: ticket.paymentAccountName || '',
+                paymentStatus: ticket.paymentStatus || (ticket.paid ? 'paid' : 'pending'),
+                bookingId: ticket.bookingId || '',
+                paidAt: ticket.paidAt || null,
                 issuedAt: ticket.issuedAt,
                 upgradedAt: ticket.upgradedAt || null
             });
@@ -1665,6 +1724,21 @@
             window.switchTab('home');
         };
 
+        window.refreshPaymentStatus = async () => {
+            try {
+                await loadTicketsFromDatabase();
+                const storedTickets = readStore(STORAGE_KEYS.tickets, {});
+                state.guests = state.guests.map(guest => {
+                    const ticket = guest.passId ? storedTickets[guest.passId] : null;
+                    return ticket ? { ...guest, paid: ticket.paid, paymentStatus: ticket.paymentStatus, paidAt: ticket.paidAt } : guest;
+                });
+                render();
+            } catch (error) {
+                alert('Could not refresh payment status. Please try again.');
+                console.error('LaBaNi payment refresh failed:', error);
+            }
+        };
+
         window.goToAdmin = () => {
             location.hash = 'admin';
         };
@@ -1831,11 +1905,11 @@
             if (state.checkoutComplete) {
                 nav.style.display = 'none';
                 header.innerHTML = `
-                    <div class="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
-                        <i data-lucide="check-circle-2" class="w-8 h-8"></i>
+                    <div class="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
+                        <i data-lucide="landmark" class="w-8 h-8"></i>
                     </div>
-                    <h1 class="text-2xl font-black italic text-slate-900 text-center animate-fade-in-up">Tickets Secured!</h1>
-                    <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">Your digital passes are ready.</p>
+                    <h1 class="text-2xl font-black italic text-slate-900 text-center animate-fade-in-up">Payment Account Ready</h1>
+                    <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">Transfer to activate your passes.</p>
                 `;
                 contextBanner.style.display = 'none';
                 mainContent.innerHTML = getReceiptsHTML();
@@ -2749,22 +2823,22 @@
                         <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-bl-full blur-2xl"></div>
                         <div class="absolute bottom-0 left-0 w-24 h-24 bg-yellow-500/20 rounded-tr-full blur-xl"></div>
                         
-                        <h3 class="font-black italic text-lg mb-5 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-400">TRANSFER DETAILS</h3>
+                        <h3 class="font-black italic text-lg mb-5 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-400">PAYMENT ACCOUNT</h3>
                         
                         <div class="space-y-4 relative z-10">
                             <div class="bg-white/10 p-3 rounded-xl border border-white/5 hover:bg-white/20 transition-colors cursor-default">
                                 <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Bank Name</p>
-                                <p class="font-bold text-lg">Stanbic IBTC</p>
+                                    <p class="font-bold text-lg">Stanbic IBTC virtual account</p>
                             </div>
                             <div class="bg-white/10 p-3 rounded-xl border border-white/5 flex justify-between items-center hover:bg-white/20 transition-colors cursor-default">
                                 <div>
                                     <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Number</p>
-                                    <p class="font-black text-2xl tracking-widest text-pink-400 font-mono">5770807090</p>
+                                    <p class="font-black text-lg tracking-tight text-pink-400">Generated after confirmation</p>
                                 </div>
                             </div>
                             <div class="bg-white/10 p-3 rounded-xl border border-white/5 hover:bg-white/20 transition-colors cursor-default">
                                 <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Name</p>
-                                <p class="font-bold text-lg">LaBani Party</p>
+                                <p class="font-bold text-lg">LaBaNi - Your Name</p>
                             </div>
                         </div>
                         
@@ -2773,7 +2847,7 @@
                             <span id="grand-total" class="text-2xl font-black text-white transition-all">${formatCurrency(calculateGrandTotal())}</span>
                         </div>
                         
-                        <p class="text-xs text-slate-400 font-medium text-center mt-5 relative z-10">Make a single transfer before confirming.</p>
+                        <p class="text-xs text-slate-400 font-medium text-center mt-5 relative z-10">Tap the button below to reserve tickets and get a unique account for one transfer.</p>
                     </div>
 
                     <label class="flex items-start gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm animate-fade-in-up delay-400 cursor-pointer">
@@ -2813,7 +2887,7 @@
 
             let btnContent = processing 
                 ? `<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>` 
-                : `<i data-lucide="check-circle-2" class="w-6 h-6"></i> ${valid ? 'I Have Transferred' : (state.acceptedLegal ? 'Fill All Names to Pay' : 'Accept Terms to Pay')}`;
+                : `<i data-lucide="landmark" class="w-6 h-6"></i> ${valid ? 'Generate Payment Account' : (state.acceptedLegal ? 'Fill All Names to Pay' : 'Accept Terms to Pay')}`;
 
             const activeClass = valid ? "bg-pink-600 shadow-xl shadow-pink-500/20 hover:scale-[1.02] active:scale-[0.98] glow-effect" : "bg-slate-200 text-slate-400 cursor-not-allowed";
 
@@ -2827,6 +2901,42 @@
 
         function getReceiptsHTML() {
             let receiptsHTML = state.guests.map((guest, idx) => {
+                const storedTicket = guest.passId ? readStore(STORAGE_KEYS.tickets, {})[guest.passId] : null;
+                guest = storedTicket ? { ...guest, ...storedTicket } : guest;
+                const paymentAccountNumber = guest.paymentAccountNumber || '';
+                const paymentAccountName = guest.paymentAccountName || 'LaBaNi Party';
+                const paymentStatus = guest.paymentStatus || (guest.paid ? 'paid' : 'pending');
+                const paymentStatusHTML = guest.paid
+                    ? `<div class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-emerald-200">Paid</div>`
+                    : `<div class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-yellow-200">Pending Payment</div>`;
+                const paymentInstructionHTML = idx === 0 && paymentAccountNumber ? `
+                    <div class="mb-5 bg-slate-900 rounded-3xl p-5 shadow-xl text-white relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-bl-full blur-2xl"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-start justify-between gap-3 mb-4">
+                                <div>
+                                    <p class="text-[10px] uppercase tracking-widest text-pink-300 font-black">Stanbic IBTC Payment</p>
+                                    <h3 class="text-xl font-black italic">${guest.paid ? 'Payment Confirmed' : 'Transfer to Activate Tickets'}</h3>
+                                </div>
+                                ${paymentStatusHTML}
+                            </div>
+                            <div class="space-y-3">
+                                <div class="bg-white/10 p-3 rounded-xl border border-white/5">
+                                    <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Number</p>
+                                    <p class="font-black text-3xl tracking-widest text-pink-300 font-mono">${paymentAccountNumber}</p>
+                                </div>
+                                <div class="bg-white/10 p-3 rounded-xl border border-white/5">
+                                    <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Name</p>
+                                    <p class="font-bold text-lg">${paymentAccountName}</p>
+                                </div>
+                                <div class="flex justify-between items-center pt-2 border-t border-white/10">
+                                    <span class="text-sm font-bold text-slate-300">Amount to Transfer</span>
+                                    <span class="text-2xl font-black">${formatCurrency(guest.amountExpected || calculateGrandTotal())}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ` : '';
                 const checkIconClass = guest.isVip ? 'text-yellow-300' : 'text-emerald-500';
                 let accessListHTML = `<li class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3 h-3 ${checkIconClass}"></i> Kintik Resort Grounds</li>`;
                 
@@ -2891,6 +3001,7 @@
 
                 return `
                 <div class="mb-8 animate-fade-in-up" style="animation-delay: ${(idx + 1) * 150}ms">
+                    ${paymentInstructionHTML}
                     <div id="receipt-card-${guest.id}" class="${receiptCardClass}">
                         ${guest.isVip ? `
                             <div class="absolute -top-16 -right-14 w-40 h-40 bg-yellow-300/25 rounded-full blur-2xl"></div>
@@ -2909,7 +3020,10 @@
                                     <h3 class="${nameClass}">${guest.name}</h3>
                                     <p class="${phoneClass}"><i data-lucide="phone" class="w-[10px] h-[10px]"></i> ${guest.phone}</p>
                                 </div>
-                                ${badge}
+                                <div class="flex flex-col items-end gap-2">
+                                    ${badge}
+                                    ${paymentStatusHTML}
+                                </div>
                             </div>
 
                             <div class="${accessBoxClass}">
@@ -2943,9 +3057,14 @@
                     ${receiptsHTML}
                 </div>
                 <div class="absolute bottom-0 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 p-6 z-30 animate-slide-in-right delay-400">
-                    <button onclick="startNewBooking()" class="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-xl hover:scale-[1.02] hover:bg-black transition-all active:scale-95 flex justify-center items-center gap-2">
-                        <i data-lucide="rotate-ccw" class="w-5 h-5"></i> Start New Booking
-                    </button>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="refreshPaymentStatus()" class="bg-pink-600 text-white font-black py-4 rounded-xl shadow-xl shadow-pink-100 hover:scale-[1.02] transition-all active:scale-95 flex justify-center items-center gap-2">
+                            <i data-lucide="refresh-cw" class="w-5 h-5"></i> Refresh
+                        </button>
+                        <button onclick="startNewBooking()" class="bg-slate-900 text-white font-black py-4 rounded-xl shadow-xl hover:scale-[1.02] hover:bg-black transition-all active:scale-95 flex justify-center items-center gap-2">
+                            <i data-lucide="rotate-ccw" class="w-5 h-5"></i> New
+                        </button>
+                    </div>
                 </div>
             `;
         }

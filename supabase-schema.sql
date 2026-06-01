@@ -73,11 +73,41 @@ create table if not exists public.tickets (
   guest_name text not null,
   phone text not null,
   is_vip boolean not null default false,
-  paid boolean not null default true,
+  paid boolean not null default false,
   zones jsonb not null default '[]'::jsonb,
   amount_paid integer not null default 0,
+  amount_expected integer not null default 0,
+  payment_account_number text,
+  payment_account_name text,
+  payment_status text not null default 'pending',
+  booking_id text,
+  paid_at timestamptz,
+  payment_session_id text,
+  raw_payment_payload jsonb,
   issued_at timestamptz not null default now(),
   upgraded_at timestamptz
+);
+
+alter table public.tickets add column if not exists amount_expected integer not null default 0;
+alter table public.tickets add column if not exists payment_account_number text;
+alter table public.tickets add column if not exists payment_account_name text;
+alter table public.tickets add column if not exists payment_status text not null default 'pending';
+alter table public.tickets add column if not exists booking_id text;
+alter table public.tickets add column if not exists paid_at timestamptz;
+alter table public.tickets add column if not exists payment_session_id text;
+alter table public.tickets add column if not exists raw_payment_payload jsonb;
+alter table public.tickets alter column paid set default false;
+
+create table if not exists public.stanbic_transactions (
+  transaction_id text primary key,
+  event_code text not null references public.event_settings(event_code) on delete cascade,
+  payment_account_number text not null,
+  amount integer not null default 0,
+  sender_name text,
+  source_bank text,
+  session_id text,
+  received_at timestamptz not null default now(),
+  raw_payload jsonb not null default '{}'::jsonb
 );
 
 create table if not exists public.ticket_scans (
@@ -103,6 +133,7 @@ alter table public.zone_slider_media enable row level security;
 alter table public.vip_perks enable row level security;
 alter table public.social_proof enable row level security;
 alter table public.tickets enable row level security;
+alter table public.stanbic_transactions enable row level security;
 alter table public.ticket_scans enable row level security;
 
 drop policy if exists "public read event settings" on public.event_settings;
@@ -113,6 +144,7 @@ drop policy if exists "public read vip perks" on public.vip_perks;
 drop policy if exists "public read social proof" on public.social_proof;
 drop policy if exists "public read tickets" on public.tickets;
 drop policy if exists "public write tickets" on public.tickets;
+drop policy if exists "public read stanbic transactions" on public.stanbic_transactions;
 drop policy if exists "public read scans" on public.ticket_scans;
 drop policy if exists "public write scans" on public.ticket_scans;
 
