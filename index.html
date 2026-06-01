@@ -1198,7 +1198,6 @@
                 return { ...guest, passId: ticket.passId };
             });
             writeStore(STORAGE_KEYS.tickets, tickets);
-            await Promise.all(issuedTickets.map(upsertTicketToDatabase));
         };
 
         const ticketPayload = (guest) => {
