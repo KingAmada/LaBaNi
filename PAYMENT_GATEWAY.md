@@ -18,28 +18,25 @@ LaBaNi should not be a direct Stanbic endpoint. Stanbic continues to call Peygo/
 In [index.html](/Users/mac/Downloads/Labani/index.html), replace this placeholder with the actual Peygo Wix functions domain:
 
 ```js
-const PEYGO_FUNCTIONS_BASE_URL = (window.LABANI_PEYGO_FUNCTIONS_BASE_URL || localStorage.getItem('labani_peygo_functions_base_url') || 'https://YOUR-PEYGO-WIX-DOMAIN/_functions').replace(/\/$/, '');
+const PEYGO_FUNCTIONS_BASE_URL = (window.LABANI_PEYGO_FUNCTIONS_BASE_URL || localStorage.getItem('labani_peygo_functions_base_url') || 'https://www.peygo.net/_functions').replace(/\/$/, '');
 ```
 
 Example shape:
 
 ```js
-const PEYGO_FUNCTIONS_BASE_URL = 'https://your-peygo-site.com/_functions';
+const PEYGO_FUNCTIONS_BASE_URL = 'https://www.peygo.net/_functions';
 ```
 
 ## Peygo/Wix Backend
 
-Paste [peygo-labani-http-functions-snippet.js](/Users/mac/Downloads/Labani/peygo-labani-http-functions-snippet.js) into Peygo's existing `http-functions.js`.
+Paste [http-functions.js](/Users/mac/Downloads/Labani/http-functions.js) into Peygo's Wix backend `http-functions.js`.
 
 Create these Wix Data collections:
 
 - `LabaniBookings`
 - `LabaniDeposits`
 
-Add the two integration branches at the bottom of the snippet into the existing:
-
-- `post_stanbicNameEnquiry`
-- `post_stanbicNotifications`
+The file already includes the LaBaNi branches inside `post_stanbicNameEnquiry` and `post_stanbicNotifications`.
 
 ## Peygo Secrets
 

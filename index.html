@@ -318,7 +318,7 @@
         const SUPABASE_URL = 'https://acqypknpiqxtavzjqhpo.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjcXlwa25waXF4dGF2empxaHBvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDM5MzUsImV4cCI6MjA5NTgxOTkzNX0.kFxt6138r8eY5veJDW4A4VeYkZHW5K14jR3AwDqKT2s';
         const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const PEYGO_FUNCTIONS_BASE_URL = (window.LABANI_PEYGO_FUNCTIONS_BASE_URL || localStorage.getItem('labani_peygo_functions_base_url') || 'https://YOUR-PEYGO-WIX-DOMAIN/_functions').replace(/\/$/, '');
+        const PEYGO_FUNCTIONS_BASE_URL = (window.LABANI_PEYGO_FUNCTIONS_BASE_URL || localStorage.getItem('labani_peygo_functions_base_url') || 'https://www.peygo.net/_functions').replace(/\/$/, '');
         const PEYGO_LABANI_CREATE_BOOKING_URL = `${PEYGO_FUNCTIONS_BASE_URL}/apiLabaniCreateBooking`;
         let databaseOnline = false;
 
