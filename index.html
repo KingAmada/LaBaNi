@@ -1008,11 +1008,15 @@
         };
 
         const insertScanToDatabase = async (scan) => {
-            if (!supabaseClient) return;
+            if (!supabaseClient) return false;
             const { error } = await supabaseClient
                 .from('ticket_scans')
                 .insert(scanToRow(scan));
-            if (error) throw error;
+            if (error) {
+                console.warn('LaBaNi scan analytics insert failed:', error);
+                return false;
+            }
+            return true;
         };
 
         const fetchTicketByPassId = async (passId) => {
