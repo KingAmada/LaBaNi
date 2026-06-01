@@ -752,6 +752,84 @@ async function resolveLabaniNameEnquiry(accountNumber) {
   };
 }
 
+async function syncLabaniBookingPayment(booking, { txId = '', tx = null } = {}) {
+  const bookingId = toStr(booking?.booking_id);
+  if (!bookingId) throw new Error('LaBaNi booking is missing booking_id');
+
+  const deposits = await labaniSupabaseRequest(
+    `/rest/v1/labani_deposits?booking_id=eq.${encodeURIComponent(bookingId)}&select=transaction_id,amount,deposited_at,session_id,raw_payload&order=deposited_at.asc`
+  );
+  const depositRows = Array.isArray(deposits) ? deposits : [];
+  const totalPaid = depositRows.reduce((sum, item) => sum + Math.max(0, toNum(item.amount, 0)), 0);
+  const amountExpected = Math.max(0, toNum(booking.amount_expected, 0));
+  const paymentStatus = totalPaid >= amountExpected
+    ? (totalPaid > amountExpected ? 'overpaid' : 'paid')
+    : (totalPaid > 0 ? 'partial' : 'pending');
+  const isPaid = paymentStatus === 'paid' || paymentStatus === 'overpaid';
+  const latestDeposit = depositRows[depositRows.length - 1] || null;
+  const paidAt = isPaid ? (latestDeposit?.deposited_at || new Date().toISOString()) : null;
+  const lastTransactionId = txId || toStr(latestDeposit?.transaction_id) || toStr(booking.last_transaction_id);
+  const lastSessionId = toStr(tx?.sessionId) || toStr(latestDeposit?.session_id) || toStr(booking.last_session_id);
+  const rawPaymentPayload = tx || latestDeposit?.raw_payload || booking.raw_payment_payload || null;
+  const paymentAccountNumber = toStr(booking.wallet_account_number);
+  const paymentAccountName = toStr(booking.account_name) || 'LaBaNi Party';
+  const bookingTickets = Array.isArray(booking.tickets) ? booking.tickets : [];
+  const updatedTickets = bookingTickets.map((ticket) => ({
+    ...ticket,
+    paid: isPaid,
+    amountPaid: totalPaid,
+    amountExpected,
+    paymentAccountNumber,
+    paymentAccountName,
+    paymentStatus,
+    bookingId,
+    paidAt,
+    paymentSessionId: lastSessionId,
+    rawPaymentPayload
+  }));
+
+  const updatedRows = await labaniSupabaseRequest(
+    `/rest/v1/labani_bookings?booking_id=eq.${encodeURIComponent(bookingId)}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        total_paid: totalPaid,
+        payment_status: paymentStatus,
+        paid_at: paidAt,
+        last_transaction_id: lastTransactionId,
+        last_session_id: lastSessionId,
+        raw_payment_payload: rawPaymentPayload,
+        tickets: updatedTickets,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+
+  const updatedBooking = Array.isArray(updatedRows) && updatedRows.length ? updatedRows[0] : {
+    ...booking,
+    total_paid: totalPaid,
+    payment_status: paymentStatus,
+    paid_at: paidAt,
+    last_transaction_id: lastTransactionId,
+    last_session_id: lastSessionId,
+    raw_payment_payload: rawPaymentPayload,
+    tickets: updatedTickets
+  };
+
+  await upsertLabaniTicketsToSupabase(updatedTickets, await buildLabaniBookingStatus(updatedBooking));
+
+  return {
+    booking: updatedBooking,
+    totalPaid,
+    amountExpected,
+    paymentStatus,
+    paidAt,
+    lastTransactionId,
+    lastSessionId
+  };
+}
+
 async function recordLabaniDeposit(tx) {
   const txId = toStr(tx.transactionReferenceId || tx.requestId || tx.sessionId);
   const walletAccountNumber = toStr(tx.customerAccountNumber);
@@ -766,71 +844,38 @@ async function recordLabaniDeposit(tx) {
   const duplicate = await labaniSupabaseRequest(
     `/rest/v1/labani_deposits?transaction_id=eq.${encodeURIComponent(txId)}&select=transaction_id&limit=1`
   );
-  if (Array.isArray(duplicate) && duplicate.length) return { handled: true, duplicate: true };
 
   const bookingId = toStr(booking.booking_id);
-  await labaniSupabaseRequest('/rest/v1/labani_deposits', {
-    method: 'POST',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      transaction_id: txId,
-      booking_id: bookingId,
-      event_code: LABANI_EVENT_CODE,
-      wallet_account_number: walletAccountNumber,
-      amount,
-      sender_name: toStr(tx.srcAcctName),
-      source_bank: toStr(tx.srcBank),
-      session_id: toStr(tx.sessionId),
-      deposited_at: new Date(tx.timestamp || Date.now()).toISOString(),
-      raw_payload: tx
-    })
-  });
-
-  const deposits = await labaniSupabaseRequest(
-    `/rest/v1/labani_deposits?booking_id=eq.${encodeURIComponent(bookingId)}&select=amount`
-  );
-  const totalPaid = (deposits || []).reduce((sum, item) => sum + Math.max(0, toNum(item.amount, 0)), 0);
-  const amountExpected = Math.max(0, toNum(booking.amount_expected, 0));
-  const paymentStatus = totalPaid >= amountExpected
-    ? (totalPaid > amountExpected ? 'overpaid' : 'paid')
-    : 'partial';
-  const paidAt = totalPaid >= amountExpected ? new Date(tx.timestamp || Date.now()).toISOString() : null;
-
-  const updatedRows = await labaniSupabaseRequest(
-    `/rest/v1/labani_bookings?booking_id=eq.${encodeURIComponent(bookingId)}`,
-    {
-      method: 'PATCH',
-      headers: { Prefer: 'return=representation' },
+  const isDuplicate = Array.isArray(duplicate) && duplicate.length > 0;
+  if (!isDuplicate) {
+    await labaniSupabaseRequest('/rest/v1/labani_deposits', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({
-        total_paid: totalPaid,
-        payment_status: paymentStatus,
-        paid_at: paidAt,
-        last_transaction_id: txId,
-        last_session_id: toStr(tx.sessionId),
-        raw_payment_payload: tx,
-        updated_at: new Date().toISOString()
+        transaction_id: txId,
+        booking_id: bookingId,
+        event_code: LABANI_EVENT_CODE,
+        wallet_account_number: walletAccountNumber,
+        amount,
+        sender_name: toStr(tx.srcAcctName),
+        source_bank: toStr(tx.srcBank),
+        session_id: toStr(tx.sessionId),
+        deposited_at: new Date(tx.timestamp || Date.now()).toISOString(),
+        raw_payload: tx
       })
-    }
-  );
+    });
+  }
 
-  const updatedBooking = Array.isArray(updatedRows) && updatedRows.length ? updatedRows[0] : {
-    ...booking,
-    total_paid: totalPaid,
-    payment_status: paymentStatus,
-    paid_at: paidAt,
-    last_session_id: toStr(tx.sessionId),
-    raw_payment_payload: tx
-  };
-  const tickets = Array.isArray(updatedBooking.tickets) ? updatedBooking.tickets : [];
-  await upsertLabaniTicketsToSupabase(tickets, await buildLabaniBookingStatus(updatedBooking));
+  const synced = await syncLabaniBookingPayment(booking, { txId, tx });
 
   return {
     handled: true,
+    duplicate: isDuplicate,
     bookingId,
     walletAccountNumber,
     amount,
-    totalPaid,
-    paymentStatus
+    totalPaid: synced.totalPaid,
+    paymentStatus: synced.paymentStatus
   };
 }
 
