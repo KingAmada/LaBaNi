@@ -1,4 +1,4 @@
-const CACHE_NAME = 'labani-pwa-v7';
+const CACHE_NAME = 'labani-pwa-v8';
 const APP_SHELL = [
   './',
   './index.html',

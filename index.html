@@ -914,6 +914,34 @@
             upgradedAt: row.upgraded_at || null
         });
 
+        const bookingTicketToTicket = (ticket, booking) => {
+            const paymentStatus = ticket.paymentStatus || booking.payment_status || 'pending';
+            const paid = ticket.paid === true || String(ticket.paid).toLowerCase() === 'true' || ['paid', 'overpaid'].includes(String(paymentStatus).toLowerCase());
+            const isVip = ticket.isVip === true || ticket.is_vip === true || String(ticket.isVip ?? ticket.is_vip).toLowerCase() === 'true';
+            const passId = ticket.passId || ticket.pass_id || '';
+            return {
+                event: booking.event_code || EVENT_CODE,
+                passId,
+                guestId: ticket.guestId || ticket.guest_id || passId,
+                name: ticket.name || ticket.guest_name || '',
+                phone: String(ticket.phone || '').replace(/\D/g, ''),
+                isVip,
+                paid,
+                zones: Array.isArray(ticket.zones) ? ticket.zones : [],
+                amountPaid: Number(ticket.amountPaid ?? booking.total_paid ?? 0),
+                amountExpected: Number(ticket.amountExpected ?? booking.amount_expected ?? 0),
+                paymentAccountNumber: ticket.paymentAccountNumber || booking.wallet_account_number || '',
+                paymentAccountName: ticket.paymentAccountName || booking.account_name || '',
+                paymentStatus,
+                bookingId: ticket.bookingId || booking.booking_id || '',
+                paidAt: ticket.paidAt || booking.paid_at || null,
+                paymentSessionId: ticket.paymentSessionId || booking.last_session_id || '',
+                rawPaymentPayload: ticket.rawPaymentPayload || booking.raw_payment_payload || null,
+                issuedAt: ticket.issuedAt || booking.created_at || new Date().toISOString(),
+                upgradedAt: ticket.upgradedAt || null
+            };
+        };
+
         const normalizeScan = (row) => ({
             id: row.scan_id,
             passId: row.pass_id,
@@ -1131,19 +1159,52 @@
             return true;
         };
 
+        const applyRealtimeBookingUpdate = (row, { renderAfter = true } = {}) => {
+            if (!row || row.event_code !== EVENT_CODE) return false;
+            const activeBooking = readStore(STORAGE_KEYS.activeBooking, null);
+            if (!activeBooking?.bookingId || row.booking_id !== activeBooking.bookingId) return false;
+
+            const tickets = (Array.isArray(row.tickets) ? row.tickets : [])
+                .map(ticket => bookingTicketToTicket(ticket, row))
+                .filter(ticket => ticket.passId);
+            if (!tickets.length) return false;
+
+            cacheTickets(tickets);
+            state.guests = state.guests.map((guest) => {
+                const ticket = tickets.find(item => item.passId === guest.passId || item.guestId === guest.id);
+                return ticket ? { ...guest, ...ticketToGuestState(ticket) } : guest;
+            });
+            restoreActiveBooking();
+
+            if (renderAfter) render();
+            return true;
+        };
+
         const syncActiveBookingPayment = async ({ renderAfter = false } = {}) => {
             const activeBooking = readStore(STORAGE_KEYS.activeBooking, null);
             if (!supabaseClient || !activeBooking?.bookingId) return false;
 
-            const { data, error } = await supabaseClient
-                .from('tickets')
-                .select('*')
-                .eq('event_code', EVENT_CODE)
-                .eq('booking_id', activeBooking.bookingId);
-            if (error) throw error;
+            const [bookingResult, ticketsResult] = await Promise.all([
+                supabaseClient
+                    .from('labani_bookings')
+                    .select('*')
+                    .eq('event_code', EVENT_CODE)
+                    .eq('booking_id', activeBooking.bookingId)
+                    .maybeSingle(),
+                supabaseClient
+                    .from('tickets')
+                    .select('*')
+                    .eq('event_code', EVENT_CODE)
+                    .eq('booking_id', activeBooking.bookingId)
+            ]);
+            if (bookingResult.error) throw bookingResult.error;
+            if (ticketsResult.error) throw ticketsResult.error;
 
             let changed = false;
-            (data || []).forEach((row) => {
+            if (bookingResult.data) {
+                changed = applyRealtimeBookingUpdate(bookingResult.data, { renderAfter: false }) || changed;
+            }
+            (ticketsResult.data || []).forEach((row) => {
                 changed = applyRealtimeTicketUpdate(row, { renderAfter: false }) || changed;
             });
 
@@ -1187,6 +1248,18 @@
                     },
                     (payload) => {
                         if (payload.new) applyRealtimeTicketUpdate(payload.new);
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'labani_bookings',
+                        filter: `booking_id=eq.${bookingId}`
+                    },
+                    (payload) => {
+                        if (payload.new) applyRealtimeBookingUpdate(payload.new);
                     }
                 )
                 .subscribe((status) => {
