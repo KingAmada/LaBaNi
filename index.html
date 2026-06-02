@@ -1668,7 +1668,9 @@
         // --- STATE MODIFICATION FUNCTIONS ---
         window.switchTab = (tab) => {
             if (location.hash === '#admin') history.replaceState(null, '', location.pathname + location.search);
-            if(state.checkoutComplete && tab !== 'home') return; 
+            if (location.hash === '#tickets' && tab !== 'checkout') {
+                history.replaceState(null, '', location.pathname + location.search);
+            }
             state.activeTab = tab;
             render();
             // Scroll to top on tab change
@@ -2082,7 +2084,7 @@
             clearTimeout(heroRevealTimeout);
             clearTimeout(zoneRevealTimeout);
 
-            if (location.hash === '#tickets' && !state.checkoutComplete) {
+            if (location.hash === '#tickets') {
                 state.activeTab = 'checkout';
             }
 
@@ -2108,10 +2110,10 @@
                 return;
             }
 
-            if (state.checkoutComplete) {
+            if (state.checkoutComplete && state.activeTab === 'checkout') {
                 subscribeToActivePayment();
                 const paymentConfirmed = state.guests.some(guest => guest.paid || isPaidPaymentStatus(guest.paymentStatus));
-                nav.style.display = 'none';
+                nav.style.display = 'block';
                 header.innerHTML = `
                     <div class="w-16 h-16 ${paymentConfirmed ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'} rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
                         <i data-lucide="${paymentConfirmed ? 'badge-check' : 'landmark'}" class="w-8 h-8"></i>
@@ -2120,6 +2122,7 @@
                     <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">${paymentConfirmed ? 'Your passes are active.' : 'Transfer to activate your passes.'}</p>
                 `;
                 contextBanner.style.display = 'none';
+                updateNavUI();
                 mainContent.innerHTML = getReceiptsHTML();
             } else {
                 nav.style.display = 'block';
