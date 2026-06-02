@@ -553,7 +553,7 @@
             isProcessing: false,
             checkoutComplete: false,
             acceptedLegal: false,
-            manageLookup: { phone: '', passId: '', error: '', ticket: null, selectedZones: [], processing: false, complete: false, addedZones: [] },
+            manageLookup: { phone: '', passId: '', error: '', ticket: null, selectedZones: [], processing: false, complete: false, addedZones: [], pendingUpgrade: null },
             
             currentSlide: 0,
             zoneSlide: 0,
@@ -575,6 +575,8 @@
         let scannerStream = null;
         let paymentRealtimeChannel = null;
         let paymentRealtimeBookingId = '';
+        let upgradeRealtimeChannel = null;
+        let upgradeRealtimeBookingId = '';
         let scannerFrame = null;
         let deferredInstallPrompt = null;
         let installPromptTimer = null;
@@ -1212,6 +1214,59 @@
             return changed;
         };
 
+        const applyUpgradeBookingUpdate = (row, { renderAfter = true } = {}) => {
+            const lookup = state.manageLookup;
+            const pending = lookup.pendingUpgrade;
+            if (!row || row.event_code !== EVENT_CODE || !pending?.bookingId || row.booking_id !== pending.bookingId) return false;
+
+            const tickets = (Array.isArray(row.tickets) ? row.tickets : [])
+                .map(ticket => bookingTicketToTicket(ticket, row))
+                .filter(ticket => ticket.passId);
+            const upgradedTicket = tickets.find(ticket => ticket.passId === lookup.passId || ticket.passId === lookup.ticket?.passId);
+            const paid = isPaidPaymentStatus(row.payment_status) || Boolean(upgradedTicket?.paid);
+
+            if (upgradedTicket) {
+                cacheTickets([upgradedTicket]);
+            }
+
+            state.manageLookup = {
+                ...lookup,
+                ticket: paid && upgradedTicket ? upgradedTicket : lookup.ticket,
+                selectedZones: paid ? [] : lookup.selectedZones,
+                processing: false,
+                complete: paid,
+                addedZones: paid ? (pending.addedZones || []) : [],
+                pendingUpgrade: paid ? null : {
+                    ...pending,
+                    totalPaid: Number(row.total_paid || 0),
+                    paymentStatus: row.payment_status || pending.paymentStatus || 'pending'
+                },
+                error: paid ? '' : lookup.error
+            };
+
+            if (paid) {
+                stopUpgradeRealtime();
+            }
+
+            if (renderAfter) renderManageView();
+            return paid;
+        };
+
+        const syncPendingUpgradePayment = async ({ renderAfter = false } = {}) => {
+            const pending = state.manageLookup.pendingUpgrade;
+            if (!supabaseClient || !pending?.bookingId) return false;
+
+            const { data, error } = await supabaseClient
+                .from('labani_bookings')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .eq('booking_id', pending.bookingId)
+                .maybeSingle();
+            if (error) throw error;
+            if (!data) return false;
+            return applyUpgradeBookingUpdate(data, { renderAfter });
+        };
+
         const stopPaymentRealtime = async () => {
             if (!paymentRealtimeChannel || !supabaseClient) {
                 paymentRealtimeChannel = null;
@@ -1223,6 +1278,51 @@
             paymentRealtimeChannel = null;
             paymentRealtimeBookingId = '';
             await supabaseClient.removeChannel(channel);
+        };
+
+        const stopUpgradeRealtime = async () => {
+            if (!upgradeRealtimeChannel || !supabaseClient) {
+                upgradeRealtimeChannel = null;
+                upgradeRealtimeBookingId = '';
+                return;
+            }
+
+            const channel = upgradeRealtimeChannel;
+            upgradeRealtimeChannel = null;
+            upgradeRealtimeBookingId = '';
+            await supabaseClient.removeChannel(channel);
+        };
+
+        const subscribeToUpgradePayment = (bookingId) => {
+            if (!supabaseClient || !bookingId) {
+                if (upgradeRealtimeChannel) stopUpgradeRealtime();
+                return;
+            }
+            if (upgradeRealtimeChannel && upgradeRealtimeBookingId === bookingId) return;
+            if (upgradeRealtimeChannel) stopUpgradeRealtime();
+
+            upgradeRealtimeBookingId = bookingId;
+            upgradeRealtimeChannel = supabaseClient
+                .channel(`labani-upgrade-${bookingId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'labani_bookings',
+                        filter: `booking_id=eq.${bookingId}`
+                    },
+                    (payload) => {
+                        if (payload.new) applyUpgradeBookingUpdate(payload.new);
+                    }
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        syncPendingUpgradePayment({ renderAfter: true }).catch((error) => {
+                            console.warn('LaBaNi upgrade payment sync failed:', error);
+                        });
+                    }
+                });
         };
 
         const subscribeToActivePayment = () => {
@@ -1645,7 +1745,8 @@
             selectedZones: [],
             processing: false,
             complete: false,
-            addedZones: []
+            addedZones: [],
+            pendingUpgrade: null
         });
 
         const getUpgradeZoneTotal = (zoneIds) => {
@@ -1828,7 +1929,7 @@
 
         window.toggleUpgradeZone = (activityId) => {
             const lookup = state.manageLookup;
-            if (!lookup.ticket || lookup.processing) return;
+            if (!lookup.ticket || lookup.processing || lookup.pendingUpgrade) return;
 
             if (lookup.selectedZones.includes(activityId)) {
                 lookup.selectedZones = lookup.selectedZones.filter(id => id !== activityId);
@@ -1837,6 +1938,32 @@
             }
             lookup.complete = false;
             lookup.addedZones = [];
+            renderManageView();
+        };
+
+        window.checkZoneUpgradePayment = async () => {
+            const lookup = state.manageLookup;
+            if (!lookup.pendingUpgrade || lookup.processing) return;
+
+            state.manageLookup = { ...lookup, processing: true, error: '' };
+            renderManageView();
+
+            try {
+                const confirmed = await syncPendingUpgradePayment({ renderAfter: false });
+                if (!confirmed) {
+                    state.manageLookup = {
+                        ...state.manageLookup,
+                        processing: false,
+                        error: 'Payment is not confirmed yet. Keep this screen open; it will update automatically once the transfer arrives.'
+                    };
+                }
+            } catch (error) {
+                state.manageLookup = {
+                    ...state.manageLookup,
+                    processing: false,
+                    error: 'Could not check the upgrade payment yet. Please try again.'
+                };
+            }
             renderManageView();
         };
 
@@ -1874,42 +2001,76 @@
                 const existingZones = Array.isArray(freshTicket.zones) ? freshTicket.zones : [RESORT_GROUNDS.id];
                 const addedZones = lookup.selectedZones.filter(id => !existingZones.includes(id));
                 const upgradeTotal = getUpgradeZoneTotal(addedZones);
-                const updatedTicket = {
-                    ...freshTicket,
-                    zones: [...new Set([...existingZones, ...addedZones])],
-                    amountPaid: Number(freshTicket.amountPaid || 0) + upgradeTotal,
-                    upgradedAt: new Date().toISOString()
-                };
-
-                tickets[updatedTicket.passId] = updatedTicket;
-                writeStore(STORAGE_KEYS.tickets, tickets);
-                try {
-                    await upsertTicketToDatabase(updatedTicket);
-                } catch (error) {
+                if (!addedZones.length || upgradeTotal <= 0) {
                     state.manageLookup = {
                         ...lookup,
+                        ticket: freshTicket,
+                        selectedZones: [],
                         processing: false,
-                        error: 'Zone upgrade could not be saved to the database. Please try again.'
+                        complete: true,
+                        addedZones: []
                     };
                     renderManageView();
                     return;
                 }
 
-                state.manageLookup = {
-                    phone: updatedTicket.phone,
-                    passId: updatedTicket.passId,
-                    error: '',
-                    ticket: updatedTicket,
-                    selectedZones: [],
-                    processing: false,
-                    complete: true,
-                    addedZones
+                const bookingId = `upgrade-${freshTicket.passId.replace(/[^A-Z0-9]/gi, '')}-${Date.now()}`;
+                const updatedTicket = {
+                    ...freshTicket,
+                    zones: [...new Set([...existingZones, ...addedZones])],
+                    amountPaid: Number(freshTicket.amountPaid || 0) + upgradeTotal,
+                    amountExpected: Number(freshTicket.amountExpected || freshTicket.amountPaid || 0) + upgradeTotal,
+                    paymentStatus: 'pending',
+                    upgradedAt: new Date().toISOString()
                 };
+
+                let peygoBooking = null;
+                try {
+                    peygoBooking = await createPeygoBooking({
+                        bookingId,
+                        amountExpected: upgradeTotal,
+                        accountName: `LaBaNi Upgrade - ${freshTicket.name || freshTicket.passId}`,
+                        primaryGuestName: freshTicket.name || 'LaBaNi Guest',
+                        primaryGuestPhone: freshTicket.phone,
+                        tickets: [updatedTicket],
+                        bookingType: 'zone_upgrade',
+                        deferTicketUpsertUntilPaid: true
+                    });
+                } catch (error) {
+                    state.manageLookup = {
+                        ...lookup,
+                        processing: false,
+                        error: error.message || 'Could not create a payment account for this zone upgrade. Please try again.'
+                    };
+                    renderManageView();
+                    return;
+                }
+
+                const pendingUpgrade = {
+                    bookingId,
+                    addedZones,
+                    upgradeTotal,
+                    walletAccountNumber: String(peygoBooking.walletAccountNumber || '').trim(),
+                    accountName: String(peygoBooking.accountName || `LaBaNi Upgrade - ${freshTicket.name || freshTicket.passId}`).trim(),
+                    paymentStatus: 'pending',
+                    totalPaid: 0
+                };
+                state.manageLookup = {
+                    ...lookup,
+                    error: '',
+                    ticket: freshTicket,
+                    processing: false,
+                    complete: false,
+                    addedZones: [],
+                    pendingUpgrade
+                };
+                subscribeToUpgradePayment(bookingId);
                 renderManageView();
             }, 1800);
         };
 
         window.resetManageLogin = () => {
+            stopUpgradeRealtime();
             state.manageLookup = getBlankManageLookup();
             renderManageView();
         };
@@ -2783,10 +2944,20 @@
                 </div>
             `;
 
-            const paymentHTML = lookup.selectedZones.length ? `
+            const pendingUpgrade = lookup.pendingUpgrade;
+            const pendingZoneNames = pendingUpgrade?.addedZones?.length
+                ? pendingUpgrade.addedZones.map(id => RESORT_ACTIVITIES.find(a => a.id === id)?.name).filter(Boolean).join(', ')
+                : '';
+            const paymentHTML = pendingUpgrade ? `
                 <div class="bg-slate-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden animate-fade-in-up delay-200">
                     <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-bl-full blur-2xl"></div>
-                    <h3 class="font-black italic text-lg mb-5 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-400">ZONE UPGRADE PAYMENT</h3>
+                    <div class="relative z-10 mb-5">
+                        <div class="inline-flex items-center gap-2 bg-yellow-400/10 text-yellow-200 border border-yellow-300/20 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest mb-3">
+                            <i data-lucide="clock" class="w-4 h-4"></i> Waiting for transfer
+                        </div>
+                        <h3 class="font-black italic text-lg text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-400">ZONE UPGRADE PAYMENT</h3>
+                        ${pendingZoneNames ? `<p class="text-xs font-bold text-slate-300 mt-1">${pendingZoneNames}</p>` : ''}
+                    </div>
                     <div class="space-y-4 relative z-10">
                         <div class="bg-white/10 p-3 rounded-xl border border-white/5">
                             <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Bank Name</p>
@@ -2794,19 +2965,36 @@
                         </div>
                         <div class="bg-white/10 p-3 rounded-xl border border-white/5">
                             <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Number</p>
-                            <p class="font-black text-2xl tracking-widest text-pink-400 font-mono">5770807090</p>
+                            <p class="font-black text-2xl tracking-widest text-pink-400 font-mono">${pendingUpgrade.walletAccountNumber}</p>
                         </div>
                         <div class="bg-white/10 p-3 rounded-xl border border-white/5">
                             <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Name</p>
-                            <p class="font-bold text-lg">LaBani Party</p>
+                            <p class="font-bold text-lg">${pendingUpgrade.accountName}</p>
                         </div>
+                    </div>
+                    <div class="mt-6 pt-5 border-t border-white/10 flex justify-between items-center relative z-10">
+                        <span class="font-bold text-slate-300">Upgrade Total</span>
+                        <span class="text-2xl font-black text-white">${formatCurrency(pendingUpgrade.upgradeTotal)}</span>
+                    </div>
+                    <p class="text-xs font-bold text-slate-300 mt-4 relative z-10 leading-relaxed">Your zones will unlock automatically after Stanbic confirms this exact transfer. Do not close this screen if you want instant update.</p>
+                    <button onclick="checkZoneUpgradePayment()" ${lookup.processing ? 'disabled' : ''} class="w-full mt-5 bg-white text-slate-950 font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 ${lookup.processing ? 'opacity-80' : 'hover:scale-[1.02]'}">
+                        ${lookup.processing ? '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-950"></div> Checking...' : '<i data-lucide="refresh-cw" class="w-5 h-5"></i> Check Payment Status'}
+                    </button>
+                </div>
+            ` : lookup.selectedZones.length ? `
+                <div class="bg-slate-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden animate-fade-in-up delay-200">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-bl-full blur-2xl"></div>
+                    <h3 class="font-black italic text-lg mb-5 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-400">ZONE UPGRADE PAYMENT</h3>
+                    <div class="bg-white/10 p-4 rounded-2xl border border-white/5 relative z-10">
+                        <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Selected Zones</p>
+                        <p class="font-bold text-sm">${lookup.selectedZones.map(id => RESORT_ACTIVITIES.find(a => a.id === id)?.name).filter(Boolean).join(', ')}</p>
                     </div>
                     <div class="mt-6 pt-5 border-t border-white/10 flex justify-between items-center relative z-10">
                         <span class="font-bold text-slate-300">Upgrade Total</span>
                         <span class="text-2xl font-black text-white">${formatCurrency(selectedTotal)}</span>
                     </div>
                     <button onclick="confirmZoneUpgrade()" ${lookup.processing ? 'disabled' : ''} class="w-full mt-5 bg-pink-600 text-white font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl shadow-pink-500/20 active:scale-95 ${lookup.processing ? 'opacity-80' : 'hover:scale-[1.02] glow-effect'}">
-                        ${lookup.processing ? '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Confirming...' : '<i data-lucide="check-circle-2" class="w-5 h-5"></i> I Have Transferred for Zones'}
+                        ${lookup.processing ? '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> Creating Account...' : '<i data-lucide="landmark" class="w-5 h-5"></i> Get Upgrade Payment Account'}
                     </button>
                 </div>
             ` : '';
@@ -3452,6 +3640,9 @@
         window.addEventListener('beforeunload', () => {
             if (paymentRealtimeChannel && supabaseClient) {
                 supabaseClient.removeChannel(paymentRealtimeChannel);
+            }
+            if (upgradeRealtimeChannel && supabaseClient) {
+                supabaseClient.removeChannel(upgradeRealtimeChannel);
             }
         });
 

@@ -138,8 +138,8 @@ begin
     coalesce(nullif(ticket->>'isVip', '')::boolean, false),
     is_paid,
     coalesce(ticket->'zones', '[]'::jsonb),
-    paid_total,
-    booking_record.amount_expected,
+    greatest(paid_total, coalesce(nullif(ticket->>'amountPaid', '')::integer, 0)),
+    greatest(booking_record.amount_expected, coalesce(nullif(ticket->>'amountExpected', '')::integer, 0)),
     booking_record.wallet_account_number,
     booking_record.account_name,
     next_status,
@@ -152,16 +152,18 @@ begin
   where nullif(ticket->>'passId', '') is not null
     and nullif(ticket->>'name', '') is not null
   on conflict (pass_id) do update set
-    paid = excluded.paid,
-    amount_paid = excluded.amount_paid,
-    amount_expected = excluded.amount_expected,
-    payment_account_number = excluded.payment_account_number,
-    payment_account_name = excluded.payment_account_name,
-    payment_status = excluded.payment_status,
-    booking_id = excluded.booking_id,
-    paid_at = excluded.paid_at,
-    payment_session_id = excluded.payment_session_id,
-    raw_payment_payload = excluded.raw_payment_payload;
+    paid = public.tickets.paid or excluded.paid,
+    zones = case when excluded.paid then excluded.zones else public.tickets.zones end,
+    amount_paid = case when excluded.paid then greatest(public.tickets.amount_paid, excluded.amount_paid) else public.tickets.amount_paid end,
+    amount_expected = case when excluded.paid then greatest(public.tickets.amount_expected, excluded.amount_expected) else public.tickets.amount_expected end,
+    payment_account_number = case when excluded.paid then excluded.payment_account_number else public.tickets.payment_account_number end,
+    payment_account_name = case when excluded.paid then excluded.payment_account_name else public.tickets.payment_account_name end,
+    payment_status = case when excluded.paid then excluded.payment_status else public.tickets.payment_status end,
+    booking_id = case when excluded.paid then excluded.booking_id else public.tickets.booking_id end,
+    paid_at = case when excluded.paid then excluded.paid_at else public.tickets.paid_at end,
+    payment_session_id = case when excluded.paid then excluded.payment_session_id else public.tickets.payment_session_id end,
+    raw_payment_payload = case when excluded.paid then excluded.raw_payment_payload else public.tickets.raw_payment_payload end,
+    upgraded_at = case when excluded.paid then excluded.issued_at else public.tickets.upgraded_at end;
 end;
 $$;
 
@@ -244,4 +246,3 @@ where exists (
   where d.booking_id = b.booking_id
 )
 order by b.updated_at desc;
-

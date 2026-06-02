@@ -688,6 +688,11 @@ function parseLabaniJson(value, fallback = null) {
 }
 
 function labaniTicketRow(ticket, booking) {
+  const bookingTotalPaid = Math.max(0, toNum(booking.totalPaid, 0));
+  const ticketAmountPaid = Math.max(0, toNum(ticket.amountPaid, 0));
+  const amountPaid = ticketAmountPaid > bookingTotalPaid ? ticketAmountPaid : bookingTotalPaid;
+  const bookingAmountExpected = Math.max(0, toNum(booking.amountExpected, 0));
+  const ticketAmountExpected = Math.max(0, toNum(ticket.amountExpected, 0));
   return {
     event_code: LABANI_EVENT_CODE,
     pass_id: toStr(ticket.passId),
@@ -697,8 +702,8 @@ function labaniTicketRow(ticket, booking) {
     is_vip: ticket.isVip === true,
     paid: booking.paymentStatus === 'paid' || booking.paymentStatus === 'overpaid',
     zones: Array.isArray(ticket.zones) ? ticket.zones : [],
-    amount_paid: Math.max(0, toNum(booking.totalPaid, 0)),
-    amount_expected: Math.max(0, toNum(booking.amountExpected, 0)),
+    amount_paid: amountPaid,
+    amount_expected: ticketAmountExpected > bookingAmountExpected ? ticketAmountExpected : bookingAmountExpected,
     payment_account_number: toStr(booking.walletAccountNumber),
     payment_account_name: toStr(booking.accountName),
     payment_status: toStr(booking.paymentStatus) || 'pending',
@@ -2240,6 +2245,7 @@ export async function post_apiLabaniCreateBooking(request) {
     const bookingId = toStr(payload?.bookingId);
     const tickets = Array.isArray(payload?.tickets) ? payload.tickets : [];
     const amountExpected = Math.max(0, toNum(payload?.amountExpected, 0));
+    const deferTicketUpsertUntilPaid = payload?.deferTicketUpsertUntilPaid === true;
     const primaryGuestName = sanitizePublicText(payload?.primaryGuestName, 80);
     const primaryGuestPhone = normalizePhone(payload?.primaryGuestPhone || tickets[0]?.phone);
 
@@ -2250,7 +2256,9 @@ export async function post_apiLabaniCreateBooking(request) {
     const existing = await fetchLabaniBookingById(bookingId);
     if (existing) {
       const status = await buildLabaniBookingStatus(existing);
-      await upsertLabaniTicketsToSupabase(tickets, status);
+      if (!deferTicketUpsertUntilPaid) {
+        await upsertLabaniTicketsToSupabase(tickets, status);
+      }
       return apiCors({ success: true, existing: true, booking: status });
     }
 
@@ -2278,7 +2286,9 @@ export async function post_apiLabaniCreateBooking(request) {
 
     const booking = Array.isArray(createdRows) && createdRows.length ? createdRows[0] : await fetchLabaniBookingById(bookingId);
     const status = await buildLabaniBookingStatus(booking);
-    await upsertLabaniTicketsToSupabase(tickets, status);
+    if (!deferTicketUpsertUntilPaid) {
+      await upsertLabaniTicketsToSupabase(tickets, status);
+    }
     return apiCors({ success: true, existing: false, booking: status });
   } catch (err) {
     console.error('apiLabaniCreateBooking error:', err);
