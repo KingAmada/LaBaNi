@@ -794,6 +794,10 @@
             return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(amount);
         };
 
+        const getUpgradeBalanceDue = (pendingUpgrade) => {
+            return Math.max(0, Number(pendingUpgrade?.upgradeTotal || 0) - Number(pendingUpgrade?.totalPaid || 0));
+        };
+
         const getScheduledEntryDiscount = () => {
             const now = new Date();
             const elapsedMs = Math.max(0, now - DISCOUNT_START_DATE);
@@ -1953,10 +1957,14 @@
             try {
                 const confirmed = await syncPendingUpgradePayment({ renderAfter: false });
                 if (!confirmed) {
+                    const pending = state.manageLookup.pendingUpgrade;
+                    const balanceDue = getUpgradeBalanceDue(pending);
                     state.manageLookup = {
                         ...state.manageLookup,
                         processing: false,
-                        error: 'Payment is not confirmed yet. Keep this screen open; it will update automatically once the transfer arrives.'
+                        error: Number(pending?.totalPaid || 0) > 0 && balanceDue > 0
+                            ? `Partial payment received: ${formatCurrency(pending.totalPaid)}. Please complete the remaining ${formatCurrency(balanceDue)} to unlock these zones.`
+                            : 'Payment is not confirmed yet. Keep this screen open; it will update automatically once the transfer arrives.'
                     };
                 }
             } catch (error) {
@@ -2951,13 +2959,51 @@
             const pendingZoneNames = pendingUpgrade?.addedZones?.length
                 ? pendingUpgrade.addedZones.map(id => RESORT_ACTIVITIES.find(a => a.id === id)?.name).filter(Boolean).join(', ')
                 : '';
+            const pendingPaidAmount = Number(pendingUpgrade?.totalPaid || 0);
+            const pendingBalanceDue = getUpgradeBalanceDue(pendingUpgrade);
+            const pendingStatus = String(pendingUpgrade?.paymentStatus || 'pending').toLowerCase();
+            const hasPartialUpgradePayment = pendingPaidAmount > 0 && pendingBalanceDue > 0;
+            const hasOverUpgradePayment = pendingPaidAmount > Number(pendingUpgrade?.upgradeTotal || 0) || pendingStatus === 'overpaid';
+            const pendingBadgeHTML = hasPartialUpgradePayment ? `
+                <div class="inline-flex items-center gap-2 bg-amber-400/10 text-amber-200 border border-amber-300/20 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest mb-3">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i> Partial payment received
+                </div>
+            ` : pendingPaidAmount > 0 ? `
+                <div class="inline-flex items-center gap-2 bg-emerald-400/10 text-emerald-200 border border-emerald-300/20 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest mb-3">
+                    <i data-lucide="badge-check" class="w-4 h-4"></i> ${hasOverUpgradePayment ? 'Extra payment received' : 'Payment received'}
+                </div>
+            ` : `
+                <div class="inline-flex items-center gap-2 bg-yellow-400/10 text-yellow-200 border border-yellow-300/20 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest mb-3">
+                    <i data-lucide="clock" class="w-4 h-4"></i> Waiting for transfer
+                </div>
+            `;
+            const pendingPaymentNoticeHTML = hasPartialUpgradePayment ? `
+                <div class="mt-5 bg-amber-400/10 border border-amber-300/20 rounded-2xl p-4 relative z-10">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-200">Payment received, balance remaining</p>
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Received</p>
+                            <p class="font-black text-xl text-white">${formatCurrency(pendingPaidAmount)}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Pay Balance</p>
+                            <p class="font-black text-xl text-amber-200">${formatCurrency(pendingBalanceDue)}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs font-bold text-amber-100 mt-3 leading-relaxed">Send the remaining ${formatCurrency(pendingBalanceDue)} to this same account. Your zones will unlock automatically after the balance arrives.</p>
+                </div>
+            ` : pendingPaidAmount > 0 ? `
+                <div class="mt-5 bg-emerald-400/10 border border-emerald-300/20 rounded-2xl p-4 relative z-10">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-emerald-200">${hasOverUpgradePayment ? 'Extra payment received' : 'Payment received'}</p>
+                    <p class="font-black text-xl text-white mt-1">${formatCurrency(pendingPaidAmount)}</p>
+                    <p class="text-xs font-bold text-emerald-100 mt-2 leading-relaxed">We received your transfer. Final confirmation is syncing now.</p>
+                </div>
+            ` : '';
             const paymentHTML = pendingUpgrade ? `
                 <div class="bg-slate-900 rounded-3xl p-6 shadow-xl text-white relative overflow-hidden animate-fade-in-up delay-200">
                     <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-bl-full blur-2xl"></div>
                     <div class="relative z-10 mb-5">
-                        <div class="inline-flex items-center gap-2 bg-yellow-400/10 text-yellow-200 border border-yellow-300/20 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest mb-3">
-                            <i data-lucide="clock" class="w-4 h-4"></i> Waiting for transfer
-                        </div>
+                        ${pendingBadgeHTML}
                         <h3 class="font-black italic text-lg text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-yellow-400">ZONE UPGRADE PAYMENT</h3>
                         ${pendingZoneNames ? `<p class="text-xs font-bold text-slate-300 mt-1">${pendingZoneNames}</p>` : ''}
                     </div>
@@ -2979,7 +3025,8 @@
                         <span class="font-bold text-slate-300">Upgrade Total</span>
                         <span class="text-2xl font-black text-white">${formatCurrency(pendingUpgrade.upgradeTotal)}</span>
                     </div>
-                    <p class="text-xs font-bold text-slate-300 mt-4 relative z-10 leading-relaxed">Your zones will unlock automatically after Stanbic confirms this exact transfer. Do not close this screen if you want instant update.</p>
+                    ${pendingPaymentNoticeHTML}
+                    <p class="text-xs font-bold text-slate-300 mt-4 relative z-10 leading-relaxed">${hasPartialUpgradePayment ? 'Do not start a new upgrade request for this ticket; complete the balance on this account.' : 'Your zones will unlock automatically after Stanbic confirms this transfer. Do not close this screen if you want instant update.'}</p>
                     <button onclick="checkZoneUpgradePayment()" ${lookup.processing ? 'disabled' : ''} class="w-full mt-5 bg-white text-slate-950 font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 ${lookup.processing ? 'opacity-80' : 'hover:scale-[1.02]'}">
                         ${lookup.processing ? '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-950"></div> Checking...' : '<i data-lucide="refresh-cw" class="w-5 h-5"></i> Check Payment Status'}
                     </button>
