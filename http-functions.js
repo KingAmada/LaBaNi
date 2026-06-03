@@ -730,6 +730,75 @@ async function upsertLabaniTicketsToSupabase(tickets, booking) {
   });
 }
 
+async function fetchLabaniTicketByPassId(passId) {
+  const id = toStr(passId);
+  if (!id) return null;
+  const rows = await labaniSupabaseRequest(
+    `/rest/v1/tickets?event_code=eq.${encodeURIComponent(LABANI_EVENT_CODE)}&pass_id=eq.${encodeURIComponent(id)}&select=*&limit=1`
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+async function upsertPaidLabaniUpgradeTickets(tickets, booking) {
+  const bookingStatus = await buildLabaniBookingStatus(booking);
+  const paidAt = bookingStatus.paidAt || new Date().toISOString();
+  const rows = [];
+
+  for (const ticket of Array.isArray(tickets) ? tickets : []) {
+    const passId = toStr(ticket.passId || ticket.pass_id);
+    if (!passId) continue;
+
+    const existing = await fetchLabaniTicketByPassId(passId);
+    const existingZones = Array.isArray(existing?.zones) ? existing.zones : [];
+    const upgradeZones = Array.isArray(ticket.zones) ? ticket.zones : [];
+    const zones = Array.from(new Set([...existingZones, ...upgradeZones].filter(Boolean)));
+    const existingBookingId = toStr(existing?.booking_id);
+    const existingPaymentAccountNumber = toStr(existing?.payment_account_number);
+    const existingPaymentAccountName = toStr(existing?.payment_account_name);
+    const amountPaid = Math.max(
+      0,
+      toNum(existing?.amount_paid, 0),
+      toNum(bookingStatus.totalPaid, 0),
+      toNum(ticket.amountPaid || ticket.amount_paid, 0)
+    );
+
+    rows.push({
+      event_code: LABANI_EVENT_CODE,
+      pass_id: passId,
+      guest_id: toStr(existing?.guest_id) || toStr(ticket.guestId || ticket.guest_id) || passId,
+      guest_name: toStr(existing?.guest_name) || toStr(ticket.name || ticket.guest_name),
+      phone: normalizePhone(existing?.phone || ticket.phone),
+      is_vip: existing?.is_vip === true || ticket.isVip === true || ticket.is_vip === true,
+      paid: true,
+      zones,
+      amount_paid: amountPaid,
+      amount_expected: Math.max(
+        0,
+        toNum(existing?.amount_expected, 0),
+        toNum(ticket.amountExpected || ticket.amount_expected, 0)
+      ),
+      payment_account_number: existingPaymentAccountNumber || toStr(ticket.paymentAccountNumber || ticket.payment_account_number || bookingStatus.walletAccountNumber),
+      payment_account_name: existingPaymentAccountName || toStr(ticket.paymentAccountName || ticket.payment_account_name || bookingStatus.accountName),
+      payment_status: toStr(bookingStatus.paymentStatus) || 'paid',
+      booking_id: existingBookingId && !existingBookingId.startsWith('upgrade-') ? existingBookingId : toStr(ticket.originalBookingId || ticket.bookingId || ticket.booking_id || bookingStatus.bookingId),
+      paid_at: existing?.paid_at || ticket.paidAt || ticket.paid_at || paidAt,
+      payment_session_id: toStr(existing?.payment_session_id) || toStr(ticket.paymentSessionId || ticket.payment_session_id || bookingStatus.lastSessionId),
+      raw_payment_payload: existing?.raw_payment_payload || ticket.rawPaymentPayload || ticket.raw_payment_payload || bookingStatus.rawPaymentPayload || null,
+      issued_at: existing?.issued_at || ticket.issuedAt || ticket.issued_at || new Date().toISOString(),
+      upgraded_at: ticket.upgradedAt || ticket.upgraded_at || new Date().toISOString()
+    });
+  }
+
+  const validRows = rows.filter((row) => row.pass_id && row.guest_name && row.phone);
+  if (!validRows.length) return [];
+
+  return labaniSupabaseRequest('/rest/v1/tickets?on_conflict=pass_id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(validRows)
+  });
+}
+
 async function buildLabaniBookingStatus(booking) {
   const rawPaymentPayload = booking.rawPaymentPayload ?? booking.raw_payment_payload;
   return {
@@ -779,11 +848,12 @@ async function syncLabaniBookingPayment(booking, { txId = '', tx = null } = {}) 
   const paymentAccountNumber = toStr(booking.wallet_account_number);
   const paymentAccountName = toStr(booking.account_name) || 'LaBaNi Party';
   const bookingTickets = Array.isArray(booking.tickets) ? booking.tickets : [];
+  const isUpgradeBooking = bookingId.startsWith('upgrade-');
   const updatedTickets = bookingTickets.map((ticket) => ({
     ...ticket,
     paid: isPaid,
     amountPaid: totalPaid,
-    amountExpected,
+    amountExpected: isUpgradeBooking ? Math.max(amountExpected, toNum(ticket.amountExpected, 0)) : amountExpected,
     paymentAccountNumber,
     paymentAccountName,
     paymentStatus,
@@ -822,7 +892,9 @@ async function syncLabaniBookingPayment(booking, { txId = '', tx = null } = {}) 
     tickets: updatedTickets
   };
 
-  if (!bookingId.startsWith('upgrade-') || isPaid) {
+  if (isUpgradeBooking && isPaid) {
+    await upsertPaidLabaniUpgradeTickets(updatedTickets, updatedBooking);
+  } else if (!isUpgradeBooking) {
     await upsertLabaniTicketsToSupabase(updatedTickets, await buildLabaniBookingStatus(updatedBooking));
   }
 

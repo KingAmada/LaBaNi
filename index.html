@@ -976,6 +976,29 @@
             };
         };
 
+        const mergePaidUpgradeIntoTicket = (baseTicket = {}, upgradeTicket = {}, addedZones = []) => {
+            const baseZones = Array.isArray(baseTicket.zones) ? baseTicket.zones : [];
+            const upgradeZones = Array.isArray(upgradeTicket.zones) ? upgradeTicket.zones : [];
+            const zones = Array.from(new Set([...baseZones, ...upgradeZones, ...addedZones].filter(Boolean)));
+            const originalBookingId = String(baseTicket.bookingId || '').startsWith('upgrade-') ? '' : baseTicket.bookingId;
+            const basePaid = Number(baseTicket.amountPaid || 0);
+            const upgradePaid = Number(upgradeTicket.amountPaid || 0);
+            return {
+                ...baseTicket,
+                ...upgradeTicket,
+                paymentAccountNumber: baseTicket.paymentAccountNumber || upgradeTicket.paymentAccountNumber || '',
+                paymentAccountName: baseTicket.paymentAccountName || upgradeTicket.paymentAccountName || '',
+                bookingId: originalBookingId || baseTicket.bookingId || upgradeTicket.bookingId || '',
+                paid: true,
+                paymentStatus: 'paid',
+                zones,
+                amountPaid: Math.max(basePaid, upgradePaid),
+                amountExpected: Math.max(Number(baseTicket.amountExpected || 0), Number(upgradeTicket.amountExpected || 0)),
+                paidAt: baseTicket.paidAt || upgradeTicket.paidAt || new Date().toISOString(),
+                upgradedAt: upgradeTicket.upgradedAt || new Date().toISOString()
+            };
+        };
+
         const normalizeScan = (row) => ({
             id: row.scan_id,
             passId: row.pass_id,
@@ -1115,6 +1138,36 @@
             if (!ticket) return null;
             cacheTickets([ticket]);
             return ticket;
+        };
+
+        const fetchLatestPaidUpgradeTicketByPassId = async (passId, baseTicket = null) => {
+            if (!supabaseClient || !passId) return null;
+            const bookingPrefix = `upgrade-${passId.replace(/[^A-Z0-9]/gi, '')}-%`;
+            const { data, error } = await supabaseClient
+                .from('labani_bookings')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .ilike('booking_id', bookingPrefix)
+                .in('payment_status', ['paid', 'overpaid'])
+                .order('updated_at', { ascending: false })
+                .limit(5);
+            if (error) throw error;
+
+            for (const booking of data || []) {
+                const upgradeTicket = (Array.isArray(booking.tickets) ? booking.tickets : [])
+                    .map(item => bookingTicketToTicket(item, booking))
+                    .find(item => item.passId === passId);
+                if (!upgradeTicket) continue;
+
+                const mergedTicket = mergePaidUpgradeIntoTicket(baseTicket || {}, upgradeTicket, upgradeTicket.zones || []);
+                cacheTickets([mergedTicket]);
+                upsertTicketToDatabase(mergedTicket).catch((writeError) => {
+                    console.warn('LaBaNi paid upgrade repair failed:', writeError);
+                });
+                return mergedTicket;
+            }
+
+            return null;
         };
 
         const createPeygoBooking = async (booking) => {
@@ -1272,14 +1325,24 @@
             const totalPaid = Number(row.total_paid || 0);
             const requiredTotal = Number(pending.upgradeTotal || 0);
             const paid = isPaidPaymentStatus(row.payment_status) && totalPaid >= requiredTotal && requiredTotal > 0;
+            const mergedTicket = paid
+                ? mergePaidUpgradeIntoTicket(lookup.ticket || {}, upgradedTicket || {}, pending.addedZones || [])
+                : null;
 
-            if (paid && upgradedTicket) {
-                cacheTickets([upgradedTicket]);
+            if (paid && mergedTicket?.passId) {
+                cacheTickets([mergedTicket]);
+                upsertTicketToDatabase(mergedTicket).catch((error) => {
+                    console.warn('LaBaNi upgrade ticket merge failed:', error);
+                });
+                state.guests = state.guests.map((guest) => {
+                    const matchesGuest = guest.passId === mergedTicket.passId || guest.id === mergedTicket.guestId;
+                    return matchesGuest ? { ...guest, ...ticketToGuestState(mergedTicket) } : guest;
+                });
             }
 
             state.manageLookup = {
                 ...lookup,
-                ticket: paid && upgradedTicket ? upgradedTicket : lookup.ticket,
+                ticket: paid && mergedTicket ? mergedTicket : lookup.ticket,
                 selectedZones: paid ? [] : lookup.selectedZones,
                 processing: false,
                 complete: paid,
@@ -1942,6 +2005,9 @@
                 ticket = supabaseClient ? await fetchTicketByPassId(passId) : tickets[passId];
                 if (ticket && !isPaymentComplete(ticket)) {
                     ticket = await fetchBookingTicketByPassId(passId, ticket.bookingId) || ticket;
+                }
+                if (ticket && isPaymentComplete(ticket)) {
+                    ticket = await fetchLatestPaidUpgradeTicketByPassId(passId, ticket) || ticket;
                 }
             } catch (error) {
                 state.manageLookup.error = 'Could not reach the ticket database. Please check your connection and try again.';
