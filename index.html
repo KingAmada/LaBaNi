@@ -794,8 +794,24 @@
             return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(amount);
         };
 
+        const isPaidPaymentStatus = (status) => {
+            const normalized = String(status || '').toLowerCase();
+            return normalized === 'paid' || normalized === 'overpaid';
+        };
+
+        const getPaymentBalanceDue = (amountExpected, amountPaid) => {
+            return Math.max(0, Number(amountExpected || 0) - Number(amountPaid || 0));
+        };
+
+        const isPaymentComplete = ({ paymentStatus, paid, amountExpected, amountPaid } = {}) => {
+            const expected = Number(amountExpected || 0);
+            const received = Number(amountPaid || 0);
+            if (paid === true) return true;
+            return isPaidPaymentStatus(paymentStatus) && (!expected || received >= expected);
+        };
+
         const getUpgradeBalanceDue = (pendingUpgrade) => {
-            return Math.max(0, Number(pendingUpgrade?.upgradeTotal || 0) - Number(pendingUpgrade?.totalPaid || 0));
+            return getPaymentBalanceDue(pendingUpgrade?.upgradeTotal, pendingUpgrade?.totalPaid);
         };
 
         const getScheduledEntryDiscount = () => {
@@ -906,7 +922,12 @@
             name: row.guest_name,
             phone: row.phone,
             isVip: Boolean(row.is_vip),
-            paid: Boolean(row.paid),
+            paid: isPaymentComplete({
+                paid: Boolean(row.paid),
+                paymentStatus: row.payment_status,
+                amountExpected: row.amount_expected,
+                amountPaid: row.amount_paid
+            }),
             zones: Array.isArray(row.zones) ? row.zones : [],
             amountPaid: Number(row.amount_paid || 0),
             amountExpected: Number(row.amount_expected || row.amount_paid || 0),
@@ -922,7 +943,14 @@
 
         const bookingTicketToTicket = (ticket, booking) => {
             const paymentStatus = ticket.paymentStatus || booking.payment_status || 'pending';
-            const paid = ticket.paid === true || String(ticket.paid).toLowerCase() === 'true' || ['paid', 'overpaid'].includes(String(paymentStatus).toLowerCase());
+            const amountPaid = Number(ticket.amountPaid ?? booking.total_paid ?? 0);
+            const amountExpected = Number(ticket.amountExpected ?? booking.amount_expected ?? 0);
+            const paid = isPaymentComplete({
+                paid: ticket.paid === true || String(ticket.paid).toLowerCase() === 'true',
+                paymentStatus,
+                amountExpected,
+                amountPaid
+            });
             const isVip = ticket.isVip === true || ticket.is_vip === true || String(ticket.isVip ?? ticket.is_vip).toLowerCase() === 'true';
             const passId = ticket.passId || ticket.pass_id || '';
             return {
@@ -934,8 +962,8 @@
                 isVip,
                 paid,
                 zones: Array.isArray(ticket.zones) ? ticket.zones : [],
-                amountPaid: Number(ticket.amountPaid ?? booking.total_paid ?? 0),
-                amountExpected: Number(ticket.amountExpected ?? booking.amount_expected ?? 0),
+                amountPaid,
+                amountExpected,
                 paymentAccountNumber: ticket.paymentAccountNumber || booking.wallet_account_number || '',
                 paymentAccountName: ticket.paymentAccountName || booking.account_name || '',
                 paymentStatus,
@@ -1072,6 +1100,23 @@
             return ticket;
         };
 
+        const fetchBookingTicketByPassId = async (passId, bookingId = '') => {
+            if (!supabaseClient || !passId || !bookingId) return null;
+            const { data, error } = await supabaseClient
+                .from('labani_bookings')
+                .select('*')
+                .eq('event_code', EVENT_CODE)
+                .eq('booking_id', bookingId)
+                .maybeSingle();
+            if (error) throw error;
+            const ticket = (Array.isArray(data?.tickets) ? data.tickets : [])
+                .map(item => bookingTicketToTicket(item, data))
+                .find(item => item.passId === passId);
+            if (!ticket) return null;
+            cacheTickets([ticket]);
+            return ticket;
+        };
+
         const createPeygoBooking = async (booking) => {
             const response = await fetch(PEYGO_LABANI_CREATE_BOOKING_URL, {
                 method: 'POST',
@@ -1101,7 +1146,9 @@
             paymentAccountNumber: ticket.paymentAccountNumber || '',
             paymentAccountName: ticket.paymentAccountName || '',
             paymentStatus: ticket.paymentStatus || (ticket.paid ? 'paid' : 'pending'),
-            paid: Boolean(ticket.paid),
+            amountPaid: Number(ticket.amountPaid || 0),
+            amountExpected: Number(ticket.amountExpected || ticket.amountPaid || 0),
+            paid: isPaymentComplete(ticket),
             paidAt: ticket.paidAt || null,
             bookingId: ticket.bookingId || ''
         });
@@ -1138,11 +1185,6 @@
             state.activeGuestId = restoredGuests[0].id;
             state.checkoutComplete = true;
             return true;
-        };
-
-        const isPaidPaymentStatus = (status) => {
-            const normalized = String(status || '').toLowerCase();
-            return normalized === 'paid' || normalized === 'overpaid';
         };
 
         const applyRealtimeTicketUpdate = (row, { renderAfter = true } = {}) => {
@@ -1536,6 +1578,8 @@
                     passId: ticket.passId,
                     paymentAccountNumber,
                     paymentAccountName,
+                    amountPaid: 0,
+                    amountExpected: bookingTotal,
                     paymentStatus: 'pending',
                     bookingId
                 };
@@ -1896,6 +1940,9 @@
 
             try {
                 ticket = supabaseClient ? await fetchTicketByPassId(passId) : tickets[passId];
+                if (ticket && !isPaymentComplete(ticket)) {
+                    ticket = await fetchBookingTicketByPassId(passId, ticket.bookingId) || ticket;
+                }
             } catch (error) {
                 state.manageLookup.error = 'Could not reach the ticket database. Please check your connection and try again.';
                 renderManageView();
@@ -1914,8 +1961,11 @@
                 return;
             }
 
-            if (!ticket.paid) {
-                state.manageLookup.error = 'Payment has not been confirmed for this ticket. Please buy or confirm your ticket first.';
+            if (!isPaymentComplete(ticket)) {
+                const balanceDue = getPaymentBalanceDue(ticket.amountExpected, ticket.amountPaid);
+                state.manageLookup.error = Number(ticket.amountPaid || 0) > 0 && balanceDue > 0
+                    ? `Partial payment received: ${formatCurrency(ticket.amountPaid)}. Please complete the remaining ${formatCurrency(balanceDue)} before adding zones.`
+                    : 'Payment has not been confirmed for this ticket. Please buy or confirm your ticket first.';
                 renderManageView();
                 return;
             }
@@ -2284,14 +2334,39 @@
 
             if (state.checkoutComplete && state.activeTab === 'checkout') {
                 subscribeToActivePayment();
-                const paymentConfirmed = state.guests.some(guest => guest.paid || isPaidPaymentStatus(guest.paymentStatus));
+                const paymentConfirmed = state.guests.some(guest => isPaymentComplete(guest));
+                const partialPaymentReceived = !paymentConfirmed && state.guests.some((guest) => {
+                    const amountExpected = guest.amountExpected || readStore(STORAGE_KEYS.activeBooking, null)?.amountExpected || 0;
+                    const amountPaid = Number(guest.amountPaid || 0);
+                    return amountPaid > 0 && getPaymentBalanceDue(amountExpected, amountPaid) > 0;
+                });
+                const headerState = paymentConfirmed
+                    ? {
+                        bg: 'bg-emerald-100 text-emerald-600',
+                        icon: 'badge-check',
+                        title: 'Payment Confirmed',
+                        text: 'Your passes are active.'
+                    }
+                    : partialPaymentReceived
+                        ? {
+                            bg: 'bg-yellow-100 text-yellow-700',
+                            icon: 'circle-dollar-sign',
+                            title: 'Payment Received',
+                            text: 'Complete the remaining balance to activate your passes.'
+                        }
+                        : {
+                            bg: 'bg-yellow-100 text-yellow-600',
+                            icon: 'landmark',
+                            title: 'Payment Account Ready',
+                            text: 'Transfer to activate your passes.'
+                        };
                 nav.style.display = 'block';
                 header.innerHTML = `
-                    <div class="w-16 h-16 ${paymentConfirmed ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'} rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
-                        <i data-lucide="${paymentConfirmed ? 'badge-check' : 'landmark'}" class="w-8 h-8"></i>
+                    <div class="w-16 h-16 ${headerState.bg} rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner animate-scale-in">
+                        <i data-lucide="${headerState.icon}" class="w-8 h-8"></i>
                     </div>
-                    <h1 class="text-2xl font-black italic text-slate-900 text-center animate-fade-in-up">${paymentConfirmed ? 'Payment Confirmed' : 'Payment Account Ready'}</h1>
-                    <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">${paymentConfirmed ? 'Your passes are active.' : 'Transfer to activate your passes.'}</p>
+                    <h1 class="text-2xl font-black italic text-slate-900 text-center animate-fade-in-up">${headerState.title}</h1>
+                    <p class="text-sm text-slate-500 text-center animate-fade-in-up delay-100">${headerState.text}</p>
                 `;
                 contextBanner.style.display = 'none';
                 updateNavUI();
@@ -3355,11 +3430,46 @@
                 guest = storedTicket ? { ...guest, ...storedTicket } : guest;
                 const paymentAccountNumber = guest.paymentAccountNumber || activeBooking?.walletAccountNumber || '';
                 const paymentAccountName = guest.paymentAccountName || activeBooking?.accountName || 'LaBaNi Party';
-                const amountExpected = guest.amountExpected || activeBooking?.amountExpected || calculateGrandTotal();
+                const amountExpected = Number(guest.amountExpected || activeBooking?.amountExpected || calculateGrandTotal());
+                const amountPaid = Number(guest.amountPaid || 0);
+                const balanceDue = getPaymentBalanceDue(amountExpected, amountPaid);
                 const paymentStatus = guest.paymentStatus || (guest.paid ? 'paid' : 'pending');
-                const paymentStatusHTML = guest.paid
-                    ? `<div class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-emerald-200">Paid</div>`
-                    : `<div class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-yellow-200">Pending Payment</div>`;
+                const paymentComplete = isPaymentComplete({
+                    paid: guest.paid,
+                    paymentStatus,
+                    amountExpected,
+                    amountPaid
+                });
+                const partialPayment = !paymentComplete && amountPaid > 0 && balanceDue > 0;
+                const overpaid = paymentComplete && amountExpected > 0 && amountPaid > amountExpected;
+                const paymentStatusHTML = paymentComplete
+                    ? `<div class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-emerald-200">${overpaid ? 'Payment Received' : 'Paid'}</div>`
+                    : partialPayment
+                        ? `<div class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-yellow-200">Partial Payment</div>`
+                        : `<div class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-yellow-200">Pending Payment</div>`;
+                const paymentTitle = paymentComplete
+                    ? 'Payment Received'
+                    : partialPayment
+                        ? 'Partial Payment Received'
+                        : 'Transfer to Activate Tickets';
+                const paymentSummaryHTML = partialPayment ? `
+                                <div class="flex justify-between items-center pt-2 border-t border-white/10">
+                                    <span class="text-sm font-bold text-slate-300">Received</span>
+                                    <span class="text-xl font-black text-yellow-200">${formatCurrency(amountPaid)}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-bold text-slate-300">Balance to Complete</span>
+                                    <span class="text-2xl font-black">${formatCurrency(balanceDue)}</span>
+                                </div>
+                                <p class="text-xs text-yellow-100 font-bold leading-relaxed">
+                                    We received your transfer. Please complete the remaining balance to activate your ticket.
+                                </p>
+                ` : `
+                                <div class="flex justify-between items-center pt-2 border-t border-white/10">
+                                    <span class="text-sm font-bold text-slate-300">${paymentComplete ? 'Amount Received' : 'Amount to Transfer'}</span>
+                                    <span class="text-2xl font-black">${formatCurrency(paymentComplete && amountPaid > 0 ? amountPaid : amountExpected)}</span>
+                                </div>
+                `;
                 const paymentInstructionHTML = idx === 0 && paymentAccountNumber ? `
                     <div class="mb-5 bg-slate-900 rounded-3xl p-5 shadow-xl text-white relative overflow-hidden">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-bl-full blur-2xl"></div>
@@ -3367,7 +3477,7 @@
                             <div class="flex items-start justify-between gap-3 mb-4">
                                 <div>
                                     <p class="text-[10px] uppercase tracking-widest text-pink-300 font-black">Stanbic IBTC Payment</p>
-                                    <h3 class="text-xl font-black italic">${guest.paid ? 'Payment Confirmed' : 'Transfer to Activate Tickets'}</h3>
+                                    <h3 class="text-xl font-black italic">${paymentTitle}</h3>
                                 </div>
                                 ${paymentStatusHTML}
                             </div>
@@ -3380,10 +3490,7 @@
                                     <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Account Name</p>
                                     <p class="font-bold text-lg">${paymentAccountName}</p>
                                 </div>
-                                <div class="flex justify-between items-center pt-2 border-t border-white/10">
-                                    <span class="text-sm font-bold text-slate-300">Amount to Transfer</span>
-                                    <span class="text-2xl font-black">${formatCurrency(amountExpected)}</span>
-                                </div>
+                                ${paymentSummaryHTML}
                             </div>
                         </div>
                     </div>
