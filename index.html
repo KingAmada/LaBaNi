@@ -207,7 +207,12 @@
                         LaBaNi <img src="Logo%20%26%20Fav%20Icon.png" alt="LaBaNi logo" class="w-7 h-7 rounded-full object-cover not-italic shadow-sm" />
                     </h1>
                 </div>
-                <div class="animate-slide-in-right delay-100"></div>
+                <div class="animate-slide-in-right delay-100">
+                    <div data-entry-deal-badge class="blink-deal rounded-2xl bg-red-600 text-white px-3 py-1.5 text-right shadow-lg shadow-red-200 border border-red-400">
+                        <p class="text-[10px] font-black leading-none tracking-widest">50% OFF</p>
+                        <p class="text-xs font-black leading-tight">₦50,000 NOW</p>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -317,12 +322,12 @@
         const PEYGO_LABANI_CREATE_BOOKING_URL = `${PEYGO_FUNCTIONS_BASE_URL}/apiLabaniCreateBooking`;
         let databaseOnline = false;
 
-        let ORIGINAL_ENTRY_FEE = 400;
+        let ORIGINAL_ENTRY_FEE = 100000;
         let DISCOUNT_START_DATE = new Date('2026-05-29T00:00:00+01:00');
-        let STARTING_DISCOUNT_PERCENT = 0;
+        let STARTING_DISCOUNT_PERCENT = 50;
         let DAILY_DISCOUNT_DROP = 0;
         let ADDITIONAL_GUEST_DISCOUNT_PERCENT = 0;
-        let ORIGINAL_VIP_FEE = 450;
+        let ORIGINAL_VIP_FEE = 260000;
         let TOTAL_VIP_SLOTS = 10;
         const EVENT_CODE = 'LABANI-KINTIK-2026';
         const STORAGE_KEYS = {
@@ -338,7 +343,7 @@
                 name: 'Nightclub',
                 type: 'Late Night Vibes',
                 img: 'assets/red-lit-nightclub-vip-lounge Large.jpeg',
-                price: 120,
+                price: 50000,
                 icon: 'music',
                 description: 'Red-lit VIP nightclub lounge for LaBaNi 2026, built for rich Nigerian spenders, celebrity party energy, Afrobeats, highlife and late-night Naija vibes.',
                 keywords: 'LaBaNi nightclub, VIP lounge, celebrity party, Naija nightlife, rich Nigerian party, Abuja exclusive party'
@@ -348,7 +353,7 @@
                 name: 'Pool Side',
                 type: 'Wet & Wild',
                 img: 'assets/pool-party-resort Large.jpeg',
-                price: 100,
+                price: 20000,
                 icon: 'droplets',
                 description: 'Premium resort pool party zone for LaBaNi 2026 with swimwear, cabana energy, Abuja party crowd and Last Born Association wet and wild vibes.',
                 keywords: 'LaBaNi pool party, Abuja pool party, Naija resort party, VIP cabana, Last Born Association'
@@ -358,7 +363,7 @@
                 name: 'Playhouse',
                 type: 'Games & Fun',
                 img: 'assets/indoor-obstacle-play-area Large.jpeg',
-                price: 80,
+                price: 30000,
                 icon: 'tent',
                 description: 'Indoor obstacle playhouse and fun zone for LaBaNi guests, last born games, resort activities and playful premium Nigerian party moments.',
                 keywords: 'LaBaNi playhouse, resort games, last born fun, Abuja party activities, Naija event games'
@@ -368,7 +373,7 @@
                 name: 'Lounge',
                 type: 'Premium Chilling',
                 img: 'assets/restaurant-lounge-dining Large.jpeg',
-                price: 90,
+                price: 10000,
                 icon: 'glass-water',
                 description: 'Premium LaBaNi lounge and dining zone for rich Naija chilling, bottle service, spenders, VIP conversations and Nigerian highlife ambience.',
                 keywords: 'LaBaNi lounge, premium chilling, rich Nigerians, spenders, VIP dining, Abuja lounge party'
@@ -378,7 +383,7 @@
                 name: 'Karaoke Sit-out / Restaurant',
                 type: 'Food & Vocals',
                 img: 'assets/outdoor-patio-restaurant-crowd Large.jpeg',
-                price: 50,
+                price: 10000,
                 icon: 'mic',
                 description: 'Outdoor patio restaurant and karaoke sit-out for LaBaNi guests, food, vocals, grill energy, Naija highlife and social resort dining.',
                 keywords: 'LaBaNi karaoke, restaurant sit-out, Naija food, highlife, Kintik grills, Abuja party restaurant'
@@ -388,12 +393,20 @@
                 name: 'Concert',
                 type: 'Live Performances',
                 img: 'assets/evening-labani-concert-stage Large.jpeg',
-                price: 100,
+                price: 40000,
                 icon: 'party-popper',
                 description: 'LaBaNi 2026 concert stage with VIP tables, celebrity-style performances, Abuja biggest party energy, Nigerian highlife and premium crowd scenes.',
                 keywords: 'LaBaNi concert, biggest party in Abuja, celebrity party, Nigerian highlife, VIP tables, Last Born Association'
             },
         ];
+        const LABANI_FIXED_ZONE_PRICES = {
+            a1: 50000,
+            a2: 20000,
+            a3: 30000,
+            a5: 10000,
+            a6: 10000,
+            a7: 40000
+        };
 
         let VIP_PERKS = [
             "Unrestricted access to all 6 Resort Zones",
@@ -811,20 +824,40 @@
 
         const getScheduledEntryDiscount = () => {
             const now = new Date();
-            const elapsedDays = 0;
-            const discountPercent = 0;
-            const currentPrice = Math.round(ORIGINAL_ENTRY_FEE);
-            const nextDropAt = now;
-            const nextDiscountPercent = 0;
+            const elapsedMs = Math.max(0, now - DISCOUNT_START_DATE);
+            const elapsedDays = Math.floor(elapsedMs / 86400000);
+            const discountPercent = Math.max(0, STARTING_DISCOUNT_PERCENT - (elapsedDays * DAILY_DISCOUNT_DROP));
+            const currentPrice = Math.round(ORIGINAL_ENTRY_FEE * (100 - discountPercent) / 100);
+            const nextDropAt = new Date(DISCOUNT_START_DATE.getTime() + ((elapsedDays + 1) * 86400000));
+            const nextDiscountPercent = Math.max(0, discountPercent - DAILY_DISCOUNT_DROP);
             return { elapsedDays, discountPercent, currentPrice, nextDropAt, nextDiscountPercent };
         };
 
         const getEntryDiscount = () => {
-            return getScheduledEntryDiscount();
+            const scheduledDeal = getScheduledEntryDiscount();
+            const rewardActive = sessionIntroReward && new Date() < sessionIntroReward.expiresAt;
+
+            if (!rewardActive || sessionIntroReward.percent <= scheduledDeal.discountPercent) {
+                return scheduledDeal;
+            }
+
+            return {
+                ...scheduledDeal,
+                discountPercent: sessionIntroReward.percent,
+                currentPrice: Math.round(ORIGINAL_ENTRY_FEE * (100 - sessionIntroReward.percent) / 100),
+                nextDropAt: sessionIntroReward.expiresAt,
+                nextDiscountPercent: scheduledDeal.discountPercent
+            };
         };
 
         const getHeaderDealBadgeHTML = () => {
-            return '';
+            const deal = getEntryDiscount();
+            return `
+                <div data-entry-deal-badge class="blink-deal rounded-2xl bg-red-600 text-white px-3 py-1.5 text-right shadow-lg shadow-red-200 border border-red-400">
+                    <p class="text-[10px] font-black leading-none tracking-widest">${deal.discountPercent}% OFF</p>
+                    <p class="text-xs font-black leading-tight">${formatCurrency(deal.currentPrice)} NOW</p>
+                </div>
+            `;
         };
 
         const getEntryDealSignature = () => {
@@ -855,13 +888,14 @@
             });
         };
 
-        const getBaseEntryFee = () => Math.round(ORIGINAL_ENTRY_FEE);
+        const getBaseEntryFee = () => getEntryDiscount().currentPrice;
 
         const getDiscountedPrice = (originalPrice) => {
-            return Math.round(Number(originalPrice || 0));
+            const { discountPercent } = getEntryDiscount();
+            return Math.round(Number(originalPrice || 0) * (100 - discountPercent) / 100);
         };
 
-        const getVipFee = () => Math.round(ORIGINAL_VIP_FEE);
+        const getVipFee = () => getDiscountedPrice(ORIGINAL_VIP_FEE);
 
         const formatTimeLeft = (date) => {
             const diff = Math.max(0, date - new Date());
@@ -1495,12 +1529,18 @@
                     name: row.name,
                     type: row.type,
                     img: row.img,
-                    price: Number(row.price || 0),
+                    price: Number(LABANI_FIXED_ZONE_PRICES[row.activity_id] ?? row.price ?? 0),
                     icon: row.icon,
                     description: row.description,
                     keywords: row.keywords
                 }));
             }
+
+            ORIGINAL_ENTRY_FEE = 100000;
+            STARTING_DISCOUNT_PERCENT = 50;
+            DAILY_DISCOUNT_DROP = 0;
+            ADDITIONAL_GUEST_DISCOUNT_PERCENT = 0;
+            ORIGINAL_VIP_FEE = ORIGINAL_ENTRY_FEE + RESORT_ACTIVITIES.reduce((total, activity) => total + Number(activity.price || 0), 0);
 
             if (heroResult.data?.length) {
                 HERO_MEDIA = heroResult.data.map(row => ({
@@ -2523,6 +2563,7 @@
 
         function renderHomeView() {
             const container = document.getElementById('main-content');
+            const entryDeal = getEntryDiscount();
             
             let slidesHTML = HERO_MEDIA.map((media, index) => {
                 return `
@@ -2624,17 +2665,20 @@
                             <p class="text-sm text-slate-500 leading-relaxed mb-4">
                                 Get ready for the ultimate premium vibes at Kintik Resort. We've curated different activities across the resort just for you.
                             </p>
-                            <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                            <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 flex items-center gap-4 hover:shadow-md transition-shadow blink-deal">
                                 <div class="bg-pink-100 p-3 rounded-xl text-pink-600 animate-bounce">
                                     <i data-lucide="ticket" class="w-6 h-6"></i>
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-2 flex-wrap">
-                                        <p class="text-xs text-pink-600 font-bold uppercase tracking-wider">Base Entry</p>
+                                        <p class="text-xs text-pink-600 font-bold uppercase tracking-wider">Base Entry Deal</p>
+                                        <span data-entry-deal-percent class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">${entryDeal.discountPercent}% OFF</span>
                                     </div>
                                     <div class="flex items-end gap-2 flex-wrap">
-                                        <p data-entry-deal-current class="text-xl font-black text-slate-900">${formatCurrency(getBaseEntryFee())}</p>
+                                        <p data-entry-deal-current class="text-xl font-black text-slate-900">${formatCurrency(entryDeal.currentPrice)}</p>
+                                        <p class="text-sm font-black text-slate-400 line-through">${formatCurrency(ORIGINAL_ENTRY_FEE)}</p>
                                     </div>
+                                    <p class="text-[10px] text-slate-500 mt-1">Discount drops to <span data-entry-deal-next-percent>${entryDeal.nextDiscountPercent}%</span> in <span id="discount-countdown" data-entry-deal-countdown class="font-black text-red-600">${formatTimeLeft(entryDeal.nextDropAt)}</span></p>
                                 </div>
                             </div>
                         </div>
@@ -2749,6 +2793,7 @@
             const container = document.getElementById('main-content');
             const guest = getActiveGuest();
             const guestName = guest.name || 'this guest';
+            const zoneDeal = getEntryDiscount();
 
             const zoneSlidesHTML = ZONE_SLIDER_MEDIA.map((media, index) => `
                 <div id="zone-slide-${index}" class="absolute inset-0 transition-opacity duration-700 ${index === state.zoneSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}">
@@ -2773,6 +2818,7 @@
                 const isSelected = guest.selectedActivities.includes(activity.id);
                 const bgClass = isSelected ? 'bg-white shadow-lg shadow-pink-500/10 border-2 border-pink-400 scale-[1.02]' : 'bg-white shadow-sm border-2 border-transparent hover:border-slate-200 hover:scale-[1.01]';
                 const checkClass = isSelected ? 'bg-pink-500 border-pink-500 text-white animate-scale-in' : 'border-slate-300 text-transparent';
+                const currentZonePrice = getDiscountedPrice(activity.price);
 
                 return `
                 <div onclick="toggleActivity('${activity.id}')" class="relative flex items-center p-3 rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden animate-fade-in-up ${bgClass}" style="animation-delay: ${idx * 50}ms">
@@ -2783,8 +2829,13 @@
                             <p class="text-[10px] font-bold uppercase tracking-wider">${activity.type}</p>
                         </div>
                         <h3 class="text-base font-black text-slate-900 leading-tight">${activity.name}</h3>
-                        <div class="mt-2 inline-flex bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-1">
-                            <span class="text-sm font-black text-slate-900">${formatCurrency(activity.price)}</span>
+                        <div class="mt-2 blink-deal inline-flex flex-col bg-red-50 border border-red-100 rounded-xl px-2.5 py-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">${zoneDeal.discountPercent}% OFF</span>
+                                <span class="text-[11px] font-black text-slate-400 line-through">${formatCurrency(activity.price)}</span>
+                                <span class="text-sm font-black text-slate-900">${formatCurrency(currentZonePrice)}</span>
+                            </div>
+                            <p class="text-[9px] font-bold text-red-600 mt-0.5">Drops to ${zoneDeal.nextDiscountPercent}% in <span class="zone-discount-countdown">${formatTimeLeft(zoneDeal.nextDropAt)}</span></p>
                         </div>
                     </div>
                     <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2 transition-colors ${checkClass}">
@@ -2865,6 +2916,7 @@
             const container = document.getElementById('main-content');
             const guest = getActiveGuest();
             const guestName = guest.name || 'this guest';
+            const vipDeal = getEntryDiscount();
             
             const perksHTML = VIP_PERKS.map((perk, idx) => `
                 <div class="flex items-start gap-3 animate-slide-in-right" style="animation-delay: ${idx * 100}ms">
@@ -2895,11 +2947,14 @@
                                 The ultimate flex for <span class="text-white font-bold">${guestName}</span>. Skip the lines, access all 6 resort zones, premium bottle service, and absolute royalty treatment.
                             </p>
 
-                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 mb-8 border border-white/10 hover:border-yellow-400/50 transition-colors">
+                            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 mb-8 border border-white/10 hover:border-yellow-400/50 transition-colors blink-deal">
                                 <div class="flex items-center justify-between gap-3 flex-wrap mb-1">
                                     <p class="text-xs text-yellow-400 font-bold uppercase tracking-wider">Package Price</p>
+                                    <span class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">${vipDeal.discountPercent}% OFF</span>
                                 </div>
+                                <p class="text-sm font-black text-slate-400 line-through">${formatCurrency(ORIGINAL_VIP_FEE)}</p>
                                 <p class="text-3xl font-black text-white">${formatCurrency(getVipFee())}</p>
+                                <p class="text-[10px] font-bold text-red-200 mt-1">Discount drops to ${vipDeal.nextDiscountPercent}% in <span class="vip-discount-countdown">${formatTimeLeft(vipDeal.nextDropAt)}</span></p>
                                 <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
                                     <i data-lucide="check-circle-2" class="w-[14px] h-[14px] text-emerald-400"></i> Base Entry + All Activities Included
                                 </p>
@@ -2933,6 +2988,7 @@
             const container = document.getElementById('main-content');
             const lookup = state.manageLookup;
             const ticket = lookup.ticket;
+            const upgradeDeal = getEntryDiscount();
 
             if (!ticket) {
                 container.innerHTML = `
@@ -3019,6 +3075,7 @@
                 const isSelected = lookup.selectedZones.includes(activity.id);
                 const cardClass = isSelected ? 'bg-white shadow-lg shadow-pink-500/10 border-2 border-pink-400 scale-[1.02]' : 'bg-white shadow-sm border-2 border-transparent hover:border-slate-200 hover:scale-[1.01]';
                 const checkClass = isSelected ? 'bg-pink-500 border-pink-500 text-white animate-scale-in' : 'border-slate-300 text-transparent';
+                const currentZonePrice = getDiscountedPrice(activity.price);
 
                 return `
                     <div onclick="toggleUpgradeZone('${activity.id}')" class="relative flex items-center p-3 rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden animate-fade-in-up ${cardClass}" style="animation-delay: ${idx * 50}ms">
@@ -3029,8 +3086,12 @@
                                 <p class="text-[10px] font-bold uppercase tracking-wider">${activity.type}</p>
                             </div>
                             <h3 class="text-base font-black text-slate-900 leading-tight">${activity.name}</h3>
-                            <div class="mt-2 inline-flex bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-1">
-                                <span class="text-sm font-black text-slate-900">${formatCurrency(activity.price)}</span>
+                            <div class="mt-2 inline-flex flex-col bg-red-50 border border-red-100 rounded-xl px-2.5 py-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">${upgradeDeal.discountPercent}% OFF</span>
+                                    <span class="text-[11px] font-black text-slate-400 line-through">${formatCurrency(activity.price)}</span>
+                                    <span class="text-sm font-black text-slate-900">${formatCurrency(currentZonePrice)}</span>
+                                </div>
                             </div>
                         </div>
                         <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center mr-2 transition-colors ${checkClass}">
@@ -3309,15 +3370,15 @@
                         </div>
                         ${!guest.isVip ? `
                             <div class="flex justify-between items-end border-t border-slate-200 pt-2 mt-2">
-                                <span class="text-xs font-bold text-slate-600">Base Entry</span>
-                                <span class="text-xs font-black text-slate-700">${formatCurrency(getBaseEntryFee())}</span>
+                                <span class="text-xs font-bold text-red-600">Entry Discount</span>
+                                <span class="text-xs font-black text-slate-700">${getEntryDiscount().discountPercent}% off · <span class="line-through text-slate-400">${formatCurrency(ORIGINAL_ENTRY_FEE)}</span> ${formatCurrency(getBaseEntryFee())}</span>
                             </div>
                             ${guest.selectedActivities.length ? `
                                 <div class="border-t border-slate-200 pt-2 mt-2 space-y-1">
-                                    <p class="text-xs font-bold text-slate-600">Selected Zones</p>
+                                    <p class="text-xs font-bold text-red-600">Zone Discount</p>
                                     ${guest.selectedActivities.map(activityId => {
                                         const activity = RESORT_ACTIVITIES.find(a => a.id === activityId);
-                                        return activity ? `<div class="flex justify-between gap-2 text-[11px] font-bold text-slate-600"><span class="truncate">${activity.name}</span><span class="shrink-0">${formatCurrency(activity.price)}</span></div>` : '';
+                                        return activity ? `<div class="flex justify-between gap-2 text-[11px] font-bold text-slate-600"><span class="truncate">${activity.name}</span><span class="shrink-0"><span class="line-through text-slate-400">${formatCurrency(activity.price)}</span> ${formatCurrency(getDiscountedPrice(activity.price))}</span></div>` : '';
                                     }).join('')}
                                 </div>
                             ` : ''}
