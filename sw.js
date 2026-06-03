@@ -1,4 +1,4 @@
-const CACHE_NAME = 'labani-pwa-v10';
+const CACHE_NAME = 'labani-pwa-v11';
 const APP_SHELL = [
   './',
   './index.html',
@@ -41,13 +41,32 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  const requestUrl = new URL(event.request.url);
+  const isSameOrigin = requestUrl.origin === self.location.origin;
+  const shouldPreferNetwork =
+    event.request.mode === 'navigate' ||
+    (isSameOrigin && ['document', 'script', 'style'].includes(event.request.destination));
+
+  if (shouldPreferNetwork) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        const copy = response.clone();
+        if (response.ok && isSameOrigin) {
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
 
       return fetch(event.request).then(response => {
         const copy = response.clone();
-        if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+        if (response.ok && isSameOrigin) {
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
         }
         return response;

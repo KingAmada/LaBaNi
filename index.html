@@ -1223,9 +1223,11 @@
                 .map(ticket => bookingTicketToTicket(ticket, row))
                 .filter(ticket => ticket.passId);
             const upgradedTicket = tickets.find(ticket => ticket.passId === lookup.passId || ticket.passId === lookup.ticket?.passId);
-            const paid = isPaidPaymentStatus(row.payment_status) || Boolean(upgradedTicket?.paid);
+            const totalPaid = Number(row.total_paid || 0);
+            const requiredTotal = Number(pending.upgradeTotal || 0);
+            const paid = isPaidPaymentStatus(row.payment_status) && totalPaid >= requiredTotal && requiredTotal > 0;
 
-            if (upgradedTicket) {
+            if (paid && upgradedTicket) {
                 cacheTickets([upgradedTicket]);
             }
 
@@ -1238,7 +1240,7 @@
                 addedZones: paid ? (pending.addedZones || []) : [],
                 pendingUpgrade: paid ? null : {
                     ...pending,
-                    totalPaid: Number(row.total_paid || 0),
+                    totalPaid,
                     paymentStatus: row.payment_status || pending.paymentStatus || 'pending'
                 },
                 error: paid ? '' : lookup.error
@@ -1874,7 +1876,7 @@
             const phone = String(state.manageLookup.phone || '').trim();
             const passId = normalizePassId(state.manageLookup.passId);
             const tickets = readStore(STORAGE_KEYS.tickets, {});
-            let ticket = tickets[passId];
+            let ticket = null;
 
             if (!phone || !passId) {
                 state.manageLookup.error = 'Enter your phone number and ticket number to continue.';
@@ -1889,7 +1891,7 @@
             }
 
             try {
-                ticket = ticket || await fetchTicketByPassId(passId);
+                ticket = supabaseClient ? await fetchTicketByPassId(passId) : tickets[passId];
             } catch (error) {
                 state.manageLookup.error = 'Could not reach the ticket database. Please check your connection and try again.';
                 renderManageView();
@@ -2007,8 +2009,9 @@
                         ticket: freshTicket,
                         selectedZones: [],
                         processing: false,
-                        complete: true,
-                        addedZones: []
+                        complete: false,
+                        addedZones: [],
+                        error: 'Those zones are already on this ticket.'
                     };
                     renderManageView();
                     return;
@@ -2885,7 +2888,7 @@
                     </span>
                 `).join('');
 
-            const successHTML = lookup.complete ? `
+            const successHTML = lookup.complete && !lookup.pendingUpgrade ? `
                 <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-3xl p-5 animate-scale-in">
                     <div class="flex items-start gap-3">
                         <i data-lucide="badge-check" class="w-7 h-7 text-emerald-600 shrink-0"></i>

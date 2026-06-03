@@ -822,7 +822,9 @@ async function syncLabaniBookingPayment(booking, { txId = '', tx = null } = {}) 
     tickets: updatedTickets
   };
 
-  await upsertLabaniTicketsToSupabase(updatedTickets, await buildLabaniBookingStatus(updatedBooking));
+  if (!bookingId.startsWith('upgrade-') || isPaid) {
+    await upsertLabaniTicketsToSupabase(updatedTickets, await buildLabaniBookingStatus(updatedBooking));
+  }
 
   return {
     booking: updatedBooking,
