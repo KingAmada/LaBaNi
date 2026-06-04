@@ -323,9 +323,9 @@
         let databaseOnline = false;
 
         let ORIGINAL_ENTRY_FEE = 100000;
-        let DISCOUNT_START_DATE = new Date('2026-05-29T00:00:00+01:00');
+        let DISCOUNT_START_DATE = new Date('2026-06-04T00:00:00+01:00');
         let STARTING_DISCOUNT_PERCENT = 50;
-        let DAILY_DISCOUNT_DROP = 0;
+        let DAILY_DISCOUNT_DROP = 3;
         let ADDITIONAL_GUEST_DISCOUNT_PERCENT = 0;
         let ORIGINAL_VIP_FEE = 260000;
         let TOTAL_VIP_SLOTS = 10;
@@ -439,33 +439,43 @@
             { id: 7, src: 'assets/evening-labani-concert-stage Large.jpeg', label: 'Concert', description: 'Live stage, VIP tables and the biggest LaBaNi performance moment.', keywords: 'LaBaNi concert, live stage, VIP tables, biggest party in Abuja' }
         ];
 
-        const DEFAULT_SOCIAL_PROOF = [
-            "A last born secured 3 tickets last week.",
-            "Exactly this time on Thursday, someone bought a ticket.",
-            "David just bought a ticket.",
-            "Maryam just got a Nightclub zone ticket.",
-            "Tolu secured 2 LaBaNi passes this morning.",
-            "Amina just added Pool Side to her ticket.",
-            "Chinedu got his Playhouse access yesterday.",
-            "Fatima just upgraded into the Lounge zone.",
-            "Kunle secured Concert access for his crew.",
-            "Zainab got Karaoke Sit-out access last night.",
-            "Someone just paid for 4 last borns.",
-            "Ifeoma booked a ticket and added Nightclub.",
-            "Abdul just confirmed his LaBaNi pass.",
-            "Blessing secured Pool Side and Concert access.",
-            "Musa upgraded his ticket into Playhouse.",
-            "Ada just bought 2 standard tickets.",
-            "Emeka added Lounge access to his pass.",
-            "Rita just secured Karaoke and Pool Side.",
-            "A last born just paid for VIP access.",
-            "Seyi got his ticket into the Nightclub zone."
+        const SOCIAL_PROOF_NAMES = [
+            "David", "Maryam", "Tolu", "Amina", "Chinedu", "Fatima", "Kunle", "Zainab", "Ifeoma", "Abdul",
+            "Blessing", "Musa", "Ada", "Emeka", "Rita", "Seyi", "Kemi", "Nnamdi", "Halima", "Uche",
+            "Bola", "Favour", "Ahmed", "Chioma", "Daniel", "Aisha", "Segun", "Nkechi", "Yusuf", "Temi",
+            "Sandra", "Ibrahim", "Mide", "Ngozi", "Caleb", "Hauwa", "Deji", "Amaka", "Femi", "Bimpe",
+            "Obinna", "Laila", "Victor", "Hadiza", "Tunde", "Ebere", "Samuel", "Rukayat", "Chika", "Farida"
         ];
-        let SOCIAL_PROOF = [...DEFAULT_SOCIAL_PROOF];
+        const SOCIAL_PROOF_ZONES = ["Nightclub", "Pool Side", "Playhouse", "Lounge", "Karaoke Sit-out", "Concert"];
+        const SOCIAL_PROOF_TEMPLATES = [
+            ({ name, count }) => `${name} secured ${count} tickets last week.`,
+            ({ name }) => `Exactly this time on Thursday, ${name} bought a ticket.`,
+            ({ name }) => `${name} just bought a ticket.`,
+            ({ name, zone }) => `${name} just got a ticket into ${zone} zone.`,
+            ({ name }) => `${name} just confirmed a LaBaNi pass.`,
+            ({ name, zone }) => `${name} just added ${zone} access.`,
+            ({ name, count }) => `${name} paid for ${count} last borns today.`,
+            ({ name, zone }) => `${name} upgraded into ${zone} a few minutes ago.`,
+            ({ name }) => `${name} just grabbed the 50% entry deal.`,
+            ({ name, zone }) => `${name} secured ${zone} access before the next price drop.`,
+            ({ name, count }) => `${name} booked ${count} LaBaNi passes this morning.`,
+            ({ name }) => `${name} just entered the Last Born list.`,
+            ({ name, zone }) => `${name} got ${zone} access for the crew.`,
+            ({ name }) => `${name} just paid before the discount drops again.`,
+            ({ name, zone }) => `${name} added ${zone} to the entry ticket.`
+        ];
+        const DEFAULT_SOCIAL_PROOF = SOCIAL_PROOF_NAMES.slice(0, 20).map((name, index) => (
+            SOCIAL_PROOF_TEMPLATES[index % SOCIAL_PROOF_TEMPLATES.length]({
+                name,
+                zone: SOCIAL_PROOF_ZONES[index % SOCIAL_PROOF_ZONES.length],
+                count: 2 + (index % 4)
+            })
+        ));
+        let SOCIAL_PROOF = [];
 
         const INTRO_REWARD_DURATION_MS = 120000;
-        const INTRO_REWARD_SHOW_RATE = 0;
-        const INTRO_REWARD_DECISION_KEY = 'labani_intro_reward_decision_v1';
+        const INTRO_REWARD_SHOW_RATE = 0.7;
+        const INTRO_REWARD_DECISION_KEY = 'labani_intro_reward_decision_v2';
         const MIN_REWARD_PERCENT = 30;
         const MAX_REWARD_PERCENT = 55;
         const INTRO_REWARD_VARIANTS = [
@@ -1556,8 +1566,9 @@
             }
 
             ORIGINAL_ENTRY_FEE = 100000;
+            DISCOUNT_START_DATE = new Date('2026-06-04T00:00:00+01:00');
             STARTING_DISCOUNT_PERCENT = 50;
-            DAILY_DISCOUNT_DROP = 0;
+            DAILY_DISCOUNT_DROP = 3;
             ADDITIONAL_GUEST_DISCOUNT_PERCENT = 0;
             ORIGINAL_VIP_FEE = ORIGINAL_ENTRY_FEE + RESORT_ACTIVITIES.reduce((total, activity) => total + Number(activity.price || 0), 0);
 
@@ -1587,7 +1598,7 @@
 
             if (socialResult.data?.length) {
                 const databaseMessages = socialResult.data.map(row => row.message).filter(Boolean);
-                SOCIAL_PROOF = [...DEFAULT_SOCIAL_PROOF, ...databaseMessages].slice(0, 20);
+                SOCIAL_PROOF = databaseMessages;
             }
         };
 
@@ -2583,16 +2594,30 @@
             zoneRevealTimeout = setTimeout(() => revealZoneCaption(slideIndex), ZONE_REVEAL_DELAY);
         }
 
-        function getNextSocialProofMessage() {
-            const messages = SOCIAL_PROOF.length ? SOCIAL_PROOF : DEFAULT_SOCIAL_PROOF;
-            if (messages.length <= 1) return messages[0] || '';
+        function randomFrom(items) {
+            return items[Math.floor(Math.random() * items.length)];
+        }
 
-            let nextIndex = state.notifIndex;
-            while (nextIndex === state.notifIndex) {
-                nextIndex = Math.floor(Math.random() * messages.length);
+        function buildRandomSocialProofMessage() {
+            const template = randomFrom(SOCIAL_PROOF_TEMPLATES);
+            return template({
+                name: randomFrom(SOCIAL_PROOF_NAMES),
+                zone: randomFrom(SOCIAL_PROOF_ZONES),
+                count: Math.floor(2 + Math.random() * 4)
+            });
+        }
+
+        function getNextSocialProofMessage() {
+            const useDatabaseMessage = SOCIAL_PROOF.length && Math.random() < 0.2;
+            const buildMessage = () => useDatabaseMessage ? randomFrom(SOCIAL_PROOF) : buildRandomSocialProofMessage();
+            let message = buildMessage() || randomFrom(DEFAULT_SOCIAL_PROOF) || '';
+
+            for (let attempt = 0; attempt < 4 && message === state.lastSocialProofMessage; attempt += 1) {
+                message = buildMessage() || randomFrom(DEFAULT_SOCIAL_PROOF) || '';
             }
-            state.notifIndex = nextIndex;
-            return messages[nextIndex];
+
+            state.lastSocialProofMessage = message;
+            return message;
         }
 
         function showSocialProofNotification() {
@@ -2642,7 +2667,7 @@
                             <div class="bg-pink-500/20 p-2 rounded-full text-pink-400">
                                 <i data-lucide="bell" class="w-4 h-4 animate-pulse"></i>
                             </div>
-                            <p id="notif-text" class="text-sm font-medium">${SOCIAL_PROOF[state.notifIndex]}</p>
+                            <p id="notif-text" class="text-sm font-medium">${getNextSocialProofMessage()}</p>
                         </div>
                     </div>
 
