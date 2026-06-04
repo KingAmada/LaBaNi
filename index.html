@@ -439,12 +439,29 @@
             { id: 7, src: 'assets/evening-labani-concert-stage Large.jpeg', label: 'Concert', description: 'Live stage, VIP tables and the biggest LaBaNi performance moment.', keywords: 'LaBaNi concert, live stage, VIP tables, biggest party in Abuja' }
         ];
 
-        let SOCIAL_PROOF = [
-            "🎉 Chief Emeka secured a VIP Slot!",
-            "🔥 50+ last borns just joined the Pool Side.",
-            "👑 Only 3 VIP Don slots remaining!",
-            "💸 Amaka just paid for her squad.",
+        const DEFAULT_SOCIAL_PROOF = [
+            "A last born secured 3 tickets last week.",
+            "Exactly this time on Thursday, someone bought a ticket.",
+            "David just bought a ticket.",
+            "Maryam just got a Nightclub zone ticket.",
+            "Tolu secured 2 LaBaNi passes this morning.",
+            "Amina just added Pool Side to her ticket.",
+            "Chinedu got his Playhouse access yesterday.",
+            "Fatima just upgraded into the Lounge zone.",
+            "Kunle secured Concert access for his crew.",
+            "Zainab got Karaoke Sit-out access last night.",
+            "Someone just paid for 4 last borns.",
+            "Ifeoma booked a ticket and added Nightclub.",
+            "Abdul just confirmed his LaBaNi pass.",
+            "Blessing secured Pool Side and Concert access.",
+            "Musa upgraded his ticket into Playhouse.",
+            "Ada just bought 2 standard tickets.",
+            "Emeka added Lounge access to his pass.",
+            "Rita just secured Karaoke and Pool Side.",
+            "A last born just paid for VIP access.",
+            "Seyi got his ticket into the Nightclub zone."
         ];
+        let SOCIAL_PROOF = [...DEFAULT_SOCIAL_PROOF];
 
         const INTRO_REWARD_DURATION_MS = 120000;
         const INTRO_REWARD_SHOW_RATE = 0;
@@ -574,6 +591,8 @@
         let slideInterval;
         let zoneSlideInterval;
         let notifInterval;
+        let notifHideTimeout;
+        let notifTextTimeout;
         let discountInterval;
         let heroRevealTimeout;
         let zoneRevealTimeout;
@@ -1567,7 +1586,8 @@
             }
 
             if (socialResult.data?.length) {
-                SOCIAL_PROOF = socialResult.data.map(row => row.message);
+                const databaseMessages = socialResult.data.map(row => row.message).filter(Boolean);
+                SOCIAL_PROOF = [...DEFAULT_SOCIAL_PROOF, ...databaseMessages].slice(0, 20);
             }
         };
 
@@ -2381,6 +2401,8 @@
             clearInterval(slideInterval);
             clearInterval(zoneSlideInterval);
             clearInterval(notifInterval);
+            clearTimeout(notifHideTimeout);
+            clearTimeout(notifTextTimeout);
             clearInterval(discountInterval);
             clearTimeout(heroRevealTimeout);
             clearTimeout(zoneRevealTimeout);
@@ -2559,6 +2581,36 @@
         function scheduleZoneReveal(slideIndex) {
             clearTimeout(zoneRevealTimeout);
             zoneRevealTimeout = setTimeout(() => revealZoneCaption(slideIndex), ZONE_REVEAL_DELAY);
+        }
+
+        function getNextSocialProofMessage() {
+            const messages = SOCIAL_PROOF.length ? SOCIAL_PROOF : DEFAULT_SOCIAL_PROOF;
+            if (messages.length <= 1) return messages[0] || '';
+
+            let nextIndex = state.notifIndex;
+            while (nextIndex === state.notifIndex) {
+                nextIndex = Math.floor(Math.random() * messages.length);
+            }
+            state.notifIndex = nextIndex;
+            return messages[nextIndex];
+        }
+
+        function showSocialProofNotification() {
+            const notifEl = document.getElementById('social-notif');
+            const textEl = document.getElementById('notif-text');
+            if (!notifEl || !textEl || state.activeTab !== 'home') return;
+
+            clearTimeout(notifHideTimeout);
+            clearTimeout(notifTextTimeout);
+            textEl.innerText = getNextSocialProofMessage();
+            notifEl.className = 'absolute top-4 left-4 right-4 z-30 transition-all duration-700 ease-in-out transform translate-y-0 opacity-100';
+
+            notifHideTimeout = setTimeout(() => {
+                const currentNotifEl = document.getElementById('social-notif');
+                if (!currentNotifEl || state.activeTab !== 'home') return;
+
+                currentNotifEl.className = 'absolute top-4 left-4 right-4 z-30 transition-all duration-700 ease-in-out transform -translate-y-4 opacity-0 pointer-events-none';
+            }, 5200);
         }
 
         function renderHomeView() {
@@ -2748,26 +2800,8 @@
             }, 6000);
 
             // Start Notif Logic
-            notifInterval = setInterval(() => {
-                const notifEl = document.getElementById('social-notif');
-                if (!notifEl) return; // Safety check
-
-                notifEl.className = `absolute top-4 left-4 right-4 z-30 transition-all duration-700 ease-in-out transform translate-y-0 opacity-100`;
-                
-                setTimeout(() => {
-                    const currentNotifEl = document.getElementById('social-notif');
-                    if (!currentNotifEl) return; // User might have switched tabs during the 4s wait
-
-                    currentNotifEl.className = `absolute top-4 left-4 right-4 z-30 transition-all duration-700 ease-in-out transform -translate-y-4 opacity-0 pointer-events-none`;
-                    setTimeout(() => {
-                        const textEl = document.getElementById('notif-text');
-                        if (textEl) { // Final safety check before mutating
-                            state.notifIndex = (state.notifIndex + 1) % SOCIAL_PROOF.length;
-                            textEl.innerText = SOCIAL_PROOF[state.notifIndex];
-                        }
-                    }, 500);
-                }, 4000);
-            }, 9000);
+            notifTextTimeout = setTimeout(showSocialProofNotification, 900);
+            notifInterval = setInterval(showSocialProofNotification, 7800);
 
             discountInterval = setInterval(() => {
                 const deal = getEntryDiscount();
