@@ -1,4 +1,4 @@
-const CACHE_NAME = 'labani-pwa-v17';
+const CACHE_NAME = 'labani-pwa-v18';
 const APP_SHELL = [
   './',
   './index.html',
@@ -19,7 +19,8 @@ const APP_SHELL = [
   './assets/checkerboard-walkway-party-crowd%20Large.jpeg',
   './assets/outdoor-patio-restaurant-crowd%20Large.jpeg',
   './assets/evening-labani-concert-stage%20Large.jpeg',
-  './assets/kintik-suya-grill-rotisserie%20Large.jpeg'
+  './assets/kintik-suya-grill-rotisserie%20Large.jpeg',
+  './assets/pool-party-cabana-wide%20Large.jpeg'
 ];
 
 self.addEventListener('install', event => {

@@ -417,17 +417,39 @@
         ];
 
         let HERO_MEDIA = [
-            { id: 1, src: 'assets/trampoline-foam-pit-group Large.jpeg', hook: 'Are you truly a last born if you’re not at LaBaNi?', alt: 'LaBaNi 2026 playhouse foam pit group with Last Born Association party guests enjoying premium resort games.', keywords: 'LaBaNi, Last Born Association, playhouse, Naija party games' },
-            { id: 2, src: 'assets/trampoline-flip-foam-pit Large.jpeg', hook: 'Last borns deserve the full experience. Not the stories.', alt: 'Trampoline and foam pit action for LaBaNi 2026 guests, showing energetic Last Born Association fun before the big Abuja party.', keywords: 'LaBaNi 2026, trampoline, Abuja party, Last Born fun' },
-            { id: 3, src: 'assets/foam-pit-party-group Large.jpeg', hook: 'Last borns were made to enjoy life. Stop suffering and enter.', alt: 'LaBaNi foam pit party group posing inside the playhouse zone for rich Naija last borns and exclusive party guests.', keywords: 'LaBaNi party, last borns, Naija, exclusive party' },
+            { id: 1, src: 'assets/evening-labani-concert-stage Large.jpeg', hook: 'Are you truly a last born if you’re not at LaBaNi?', alt: 'LaBaNi 2026 evening concert stage with VIP tables, live performance lights and premium Abuja party energy.', keywords: 'LaBaNi concert, evening stage, VIP tables, Abuja party, live performance' },
+            { id: 2, src: 'assets/kintik-suya-grill-rotisserie Large.jpeg', hook: 'Last borns deserve the full experience. Not the stories.', alt: 'Kintik Resort suya grill and rotisserie food scene for LaBaNi guests, rich Naija party dining and premium resort enjoyment.', keywords: 'Kintik suya grill, LaBaNi food, rotisserie, Naija party dining, Abuja resort' },
+            { id: 3, src: 'assets/pool-party-resort Large.jpeg', hook: 'Last borns were made to enjoy life. Stop suffering and enter.', alt: 'LaBaNi pool party resort scene with swimwear, premium cabana lifestyle and wet and wild Abuja party vibes.', keywords: 'LaBaNi pool party, Abuja pool party, rich Nigerian party, VIP cabana' },
             { id: 4, src: 'assets/indoor-obstacle-play-area Large.jpeg', hook: 'Are you the last born that gets treated or the one that gets left out?', alt: 'Indoor obstacle play area at LaBaNi with guests, games and premium Last Born Association resort activity energy.', keywords: 'LaBaNi playhouse, obstacle zone, resort activities, Nigerian event' },
             { id: 5, src: 'assets/resort-courtyard-party Large.jpeg', hook: 'If you’re truly last born, your presence should be felt here.', alt: 'Kintik Resort courtyard party scene for LaBaNi 2026 with Nigerian guests, dining, drinks and exclusive Abuja party energy.', keywords: 'Kintik Resort, LaBaNi Abuja, exclusive party, Nigerian crowd' },
             { id: 6, src: 'assets/red-lit-nightclub-vip-lounge Large.jpeg', hook: 'Secure your spot like the last born you are.', alt: 'Red-lit LaBaNi nightclub VIP lounge for spenders, celebrity party guests, highlife lovers and Naija nightlife.', keywords: 'VIP lounge, LaBaNi nightclub, spenders, highlife, celebrity party' },
-            { id: 7, src: 'assets/pool-party-resort Large.jpeg', hook: 'Are you truly a last born if you can’t afford this?', alt: 'LaBaNi pool party resort scene with swimwear, premium cabana lifestyle and wet and wild Abuja party vibes.', keywords: 'LaBaNi pool party, Abuja pool party, rich Nigerian party, VIP cabana' },
-            { id: 8, src: 'assets/trampoline-fitness-class Large.jpeg', hook: 'A last born always gets what they want. Are you?', alt: 'Trampoline fitness party class for LaBaNi guests, adding playful Naija resort activities to the Last Born Association event.', keywords: 'trampoline party, LaBaNi activities, Last Born Association, Naija fun' },
+            { id: 7, src: 'assets/foam-pit-party-group Large.jpeg', hook: 'Are you truly a last born if you can’t afford this?', alt: 'LaBaNi foam pit party group posing inside the playhouse zone for rich Naija last borns and exclusive party guests.', keywords: 'LaBaNi party, last borns, Naija, exclusive party' },
+            { id: 8, src: 'assets/pool-party-cabana-wide Large.jpeg', hook: 'A last born always gets what they want. Are you?', alt: 'Wide LaBaNi pool party cabana scene with premium resort seating, wet and wild energy and Abuja VIP party lifestyle.', keywords: 'LaBaNi pool cabana, wide pool party, VIP cabana, Abuja resort party, premium pool side' },
             { id: 9, src: 'assets/kintik-mirror-club-interior Large.jpeg', hook: 'Last borns always go all out, they have backup, do you?', alt: 'Kintik mirror club interior with LaBaNi guests, premium nightlife reflections and rich Nigerian party atmosphere.', keywords: 'Kintik club, LaBaNi nightlife, rich Nigerian, exclusive party' },
             { id: 10, src: 'assets/restaurant-lounge-dining Large.jpeg', hook: 'The resort is ready. The question is, are you?', alt: 'LaBaNi restaurant lounge dining scene with VIP guests, Naija social energy and premium Abuja resort party setting.', keywords: 'LaBaNi lounge, restaurant, Abuja resort party, VIP dining' }
         ];
+        const HERO_MEDIA_OVERRIDES = {
+            1: {
+                src: 'assets/evening-labani-concert-stage Large.jpeg',
+                alt: 'LaBaNi 2026 evening concert stage with VIP tables, live performance lights and premium Abuja party energy.',
+                keywords: 'LaBaNi concert, evening stage, VIP tables, Abuja party, live performance'
+            },
+            2: {
+                src: 'assets/kintik-suya-grill-rotisserie Large.jpeg',
+                alt: 'Kintik Resort suya grill and rotisserie food scene for LaBaNi guests, rich Naija party dining and premium resort enjoyment.',
+                keywords: 'Kintik suya grill, LaBaNi food, rotisserie, Naija party dining, Abuja resort'
+            },
+            3: {
+                src: 'assets/pool-party-resort Large.jpeg',
+                alt: 'LaBaNi pool party resort scene with swimwear, premium cabana lifestyle and wet and wild Abuja party vibes.',
+                keywords: 'LaBaNi pool party, Abuja pool party, rich Nigerian party, VIP cabana'
+            },
+            8: {
+                src: 'assets/pool-party-cabana-wide Large.jpeg',
+                alt: 'Wide LaBaNi pool party cabana scene with premium resort seating, wet and wild energy and Abuja VIP party lifestyle.',
+                keywords: 'LaBaNi pool cabana, wide pool party, VIP cabana, Abuja resort party, premium pool side'
+            }
+        };
 
         let ZONE_SLIDER_MEDIA = [
             { id: 1, src: 'assets/pool-party-resort Large.jpeg', label: 'Pool Side', description: 'Wet and wild resort energy with cabanas, swimwear and premium LaBaNi pool party vibes.', keywords: 'LaBaNi pool party, Abuja pool side, Kintik Resort cabana, premium Naija party' },
@@ -827,6 +849,13 @@
         };
 
         // --- HELPER FUNCTIONS ---
+        function applyHeroMediaOverrides() {
+            HERO_MEDIA = HERO_MEDIA.map((media, index) => ({
+                ...media,
+                ...(HERO_MEDIA_OVERRIDES[index + 1] || {})
+            }));
+        }
+
         const formatCurrency = (amount) => {
             return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(amount);
         };
@@ -1581,6 +1610,7 @@
                     keywords: row.keywords
                 }));
             }
+            applyHeroMediaOverrides();
 
             if (zoneSliderResult.data?.length) {
                 ZONE_SLIDER_MEDIA = zoneSliderResult.data.map(row => ({
